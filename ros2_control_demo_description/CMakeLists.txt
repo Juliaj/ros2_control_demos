@@ -19,6 +19,11 @@ install(
 )
 
 install(
+  DIRECTORY mecanumwheelbot/urdf mecanumwheelbot/rviz
+  DESTINATION share/${PROJECT_NAME}/mecanumwheelbot
+)
+
+install(
   DIRECTORY r3bot/urdf
   DESTINATION share/${PROJECT_NAME}/r3bot
 )

@@ -1,0 +1,9 @@
+<library path="ros2_control_demo_example_17">
+  <class name="ros2_control_demo_example_17/MecanumWheelBotSystemHardware"
+         type="ros2_control_demo_example_17::MecanumWheelBotSystemHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ros2_control MecanumWheelBot example using a system hardware interface-type. It uses velocity and position command and state interface for the drive motor and position command and state interface. The example is the starting point to implement a hardware interface for MecanumWheelBot.
+    </description>
+  </class>
+</library>
