@@ -1,13 +1,48 @@
 controller_manager:
   ros__parameters:
-    update_rate: 10  # Hz
+    update_rate: 40  # Hz
+    update_rate_offset: 0.05
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
+    
+    mecanum_drive_controller:
+      type: mecanum_drive_controller/MecanumDriveController
+    
+    use_diagnostics: true
+    diagnostics_frequency: 10
+    diagnostics:
+      threshold:
+        controller_manager:
+          periodicity:
+            mean_error:
+              error: 10.0
+              warn: 5.0
+            standard_deviation:
+              error: 10.0
+              warn: 5.0
+        controllers:
+          execution_time:
+            mean_error:
+              error: 2000.0
+              warn: 1000.0
+            standard_deviation:
+              error: 200.0
+              warn: 100.0
+          periodicity:
+            mean_error:
+              error: 10.0
+              warn: 5.0
+            standard_deviation:
+              error: 10.0
+              warn: 5.0
+    
 
 mecanum_drive_controller:
   ros__parameters:
-    type: mecanum_drive_controller/MecanumDriveController
+    
+    # is_async: true
+    update_rate: 20  # Hz
     reference_timeout: 5.0
 
     front_left_wheel_command_joint_name: "front_left_wheel_joint"
@@ -23,5 +58,6 @@ mecanum_drive_controller:
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     enable_odom_tf: true
-    twist_covariance_diagonal: [0.0, 7.0, 14.0, 21.0, 28.0, 35.0]
-    pose_covariance_diagonal: [0.0, 7.0, 14.0, 21.0, 28.0, 35.0]
+    #  Adjust these values based on the hardware's capabilities
+    pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]

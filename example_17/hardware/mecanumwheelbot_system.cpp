@@ -22,6 +22,8 @@
 #include <memory>
 #include <sstream>
 #include <vector>
+#include <random>  // For std::mt19937 and other random number generation
+#include <thread>  // For std::this_thread::sleep_for
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -67,6 +69,15 @@ hardware_interface::CallbackReturn MecanumWheelBotSystemHardware::on_init(
   hw_start_sec_ = std::stod(info_.hardware_parameters["example_param_hw_start_duration_sec"]);
   hw_stop_sec_ = std::stod(info_.hardware_parameters["example_param_hw_stop_duration_sec"]);
   // // END: This part here is for exemplary purposes - Please do not copy to your production code
+
+  // Extract async mode setting from the hardware info
+  if (info_.hardware_parameters.count("is_async") > 0) {
+    std::string is_async_str = info_.hardware_parameters.at("is_async");
+    is_async_ = (is_async_str == "true" || is_async_str == "True" || is_async_str == "1");
+    RCLCPP_INFO(
+      get_logger(), "Hardware interface running in %s mode", 
+      is_async_ ? "async" : "sync");
+  }
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -143,15 +154,29 @@ hardware_interface::return_type MecanumWheelBotSystemHardware::read(
 {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
 
+  // Only lock and simulate latency when in async mode
+  std::unique_ptr<std::lock_guard<std::mutex>> lock = nullptr;
+  if (is_async_) {
+    lock = std::make_unique<std::lock_guard<std::mutex>>(read_mutex_);
+  
+    // Simulate random latency in hardware communication
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
+    auto latency = std::chrono::milliseconds(latency_dist(gen));
+    // update rate at 40, the max latency is 25ms
+    if (latency >= 25) {
+      RCLCPP_INFO(get_logger(), "Read latency is high: %dms", latency.count());
+    }
+    std::this_thread::sleep_for(latency);
+  }
+
   std::stringstream ss;
   ss << "Reading states:";
   ss << std::fixed << std::setprecision(2);
   // iterate through all the joints 
   for (const auto & joint : info_.joints) 
-  // for (const auto & [name, descr] : joint_state_interfaces_)
   {
-    // RCLCPP_INFO(get_logger(), "))) Reading state velocity for joint: %s", joint.name.c_str());
-    // if it is velocity, then read velocity
     if (joint.state_interfaces[0].name == hardware_interface::HW_IF_VELOCITY) {
       auto velo = get_state(joint.name + "/" + hardware_interface::HW_IF_VELOCITY);
       set_state(joint.name + "/" + hardware_interface::HW_IF_VELOCITY, velo);
@@ -159,7 +184,6 @@ hardware_interface::return_type MecanumWheelBotSystemHardware::read(
          << "\t velocity " << velo << " for '" << joint.name << "'!";
     }
     else {
-      // RCLCPP_INFO(get_logger(), "))) Reading state position for joint: %s", joint.name.c_str());
       auto pos = get_state(joint.name + "/" + hardware_interface::HW_IF_POSITION); 
       set_state(joint.name + "/" + hardware_interface::HW_IF_POSITION, pos);
       ss << std::endl
@@ -167,7 +191,6 @@ hardware_interface::return_type MecanumWheelBotSystemHardware::read(
     }
   }
   RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "%s", ss.str().c_str());
-
   // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   return hardware_interface::return_type::OK;
@@ -177,6 +200,24 @@ hardware_interface::return_type ros2_control_demo_example_17 ::MecanumWheelBotSy
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+
+  // Only lock and simulate latency when in async mode
+  std::unique_ptr<std::lock_guard<std::mutex>> lock = nullptr;
+  if (is_async_) {
+    lock = std::make_unique<std::lock_guard<std::mutex>>(write_mutex_);
+
+    // Simulate random latency in hardware communication
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
+    auto latency = std::chrono::milliseconds(latency_dist(gen));
+    // update rate at 40, the max latency is 25ms
+    if (latency >= 25) {
+      RCLCPP_INFO(get_logger(), "Write latency is high: %dms", latency.count());
+    }
+    std::this_thread::sleep_for(latency);
+  }
+
   std::stringstream ss;
   ss << "Writing commands:";
 

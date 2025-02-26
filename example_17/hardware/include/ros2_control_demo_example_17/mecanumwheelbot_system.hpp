@@ -79,15 +79,25 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
+  // Constants for latency simulation
+  static constexpr int MIN_LATENCY_MS = 1;  // Minimum latency in milliseconds
+  // for update rate at 20 Hz, 50 ms is the maximum latency
+  static constexpr int MAX_LATENCY_MS = 50; // Maximum latency in milliseconds
+
   // Parameters for the MecanumWheelBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
 
-  // joint names
-  std::string front_left_wheel_joint_;
-  std::string front_right_wheel_joint_;
-  std::string rear_right_wheel_joint_;
-  std::string rear_left_wheel_joint_;
+  // 4 wheels: front_left, front_right, rear_left, rear_right
+  std::array<double, 4> hw_commands_;
+  std::array<double, 4> hw_positions_;
+  std::array<double, 4> hw_velocities_;
+  
+  // For async hardware demo
+  bool is_async_ = true;
+  
+  std::mutex read_mutex_;
+  std::mutex write_mutex_;
 };
 
 }  // namespace ros2_control_demo_example_17
