@@ -150,7 +150,7 @@ hardware_interface::CallbackReturn MecanumWheelBotSystemHardware::on_deactivate(
 }
 
 hardware_interface::return_type MecanumWheelBotSystemHardware::read(
-  const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
 
@@ -164,9 +164,10 @@ hardware_interface::return_type MecanumWheelBotSystemHardware::read(
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
     auto latency = std::chrono::milliseconds(latency_dist(gen));
-    // update rate at 40, the max latency is 25ms
-    if (latency >= 25) {
-      RCLCPP_INFO(get_logger(), "Read latency is high: %dms", latency.count());
+    
+    // Correct comparison using count() to get the integer milliseconds value
+    if (latency.count() >= 25) {
+      RCLCPP_INFO(get_logger(), "Read latency is high: %ldms", latency.count());
     }
     std::this_thread::sleep_for(latency);
   }
@@ -211,10 +212,12 @@ hardware_interface::return_type ros2_control_demo_example_17 ::MecanumWheelBotSy
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
     auto latency = std::chrono::milliseconds(latency_dist(gen));
-    // update rate at 40, the max latency is 25ms
-    if (latency >= 25) {
-      RCLCPP_INFO(get_logger(), "Write latency is high: %dms", latency.count());
+    
+    // Correct comparison using count() to get the integer milliseconds value
+    if (latency.count() >= 25) {
+      RCLCPP_INFO(get_logger(), "Write latency is high: %ldms", latency.count());
     }
+    
     std::this_thread::sleep_for(latency);
   }
 

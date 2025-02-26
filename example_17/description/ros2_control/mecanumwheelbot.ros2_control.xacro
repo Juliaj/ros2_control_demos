@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="mecanumwheelbot_ros2_control" params="name prefix is_async:=false thread_priority:=1">
+  <xacro:macro name="mecanumwheelbot_ros2_control" params="name prefix is_async:=false thread_priority:=50 rw_rate:=0">
 
-    <ros2_control name="${name}" type="system" is_async="${is_async}" thread_priority="${thread_priority}">
+    <ros2_control name="${name}" type="system" is_async="${is_async}" thread_priority="${thread_priority}" rw_rate="${rw_rate}">
       <hardware>
         <plugin>ros2_control_demo_example_17/MecanumWheelBotSystemHardware</plugin>
         <param name="example_param_hw_start_duration_sec">0</param>

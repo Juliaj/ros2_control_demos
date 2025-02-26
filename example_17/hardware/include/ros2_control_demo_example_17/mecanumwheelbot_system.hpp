@@ -87,14 +87,9 @@ private:
   // Parameters for the MecanumWheelBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
-
-  // 4 wheels: front_left, front_right, rear_left, rear_right
-  std::array<double, 4> hw_commands_;
-  std::array<double, 4> hw_positions_;
-  std::array<double, 4> hw_velocities_;
   
   // For async hardware demo
-  bool is_async_ = true;
+  bool is_async_ = false;
   
   std::mutex read_mutex_;
   std::mutex write_mutex_;

@@ -166,7 +166,7 @@ class MecanumDriveControllersTest(Node):
         twist_msg.twist.angular.z = rotate
         return twist_msg
         
-    def create_msg_spin(self, rotation_speed=0.5):
+    def create_msg_spin(self, rotation_speed=1.0):
         """
         Create a message for pure spinning motion.
         
