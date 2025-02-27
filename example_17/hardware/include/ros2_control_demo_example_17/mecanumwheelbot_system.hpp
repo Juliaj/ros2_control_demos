@@ -91,8 +91,6 @@ private:
   // For async hardware demo
   bool is_async_ = false;
   
-  std::mutex read_mutex_;
-  std::mutex write_mutex_;
 };
 
 }  // namespace ros2_control_demo_example_17

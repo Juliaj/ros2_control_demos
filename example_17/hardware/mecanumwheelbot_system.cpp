@@ -154,18 +154,15 @@ hardware_interface::return_type MecanumWheelBotSystemHardware::read(
 {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
 
-  // Only lock and simulate latency when in async mode
-  std::unique_ptr<std::lock_guard<std::mutex>> lock = nullptr;
+  // Add simulate latency when in async mode
   if (is_async_) {
-    lock = std::make_unique<std::lock_guard<std::mutex>>(read_mutex_);
-  
+    
     // Simulate random latency in hardware communication
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
     auto latency = std::chrono::milliseconds(latency_dist(gen));
     
-    // Correct comparison using count() to get the integer milliseconds value
     if (latency.count() >= 25) {
       RCLCPP_INFO(get_logger(), "Read latency is high: %ldms", latency.count());
     }
@@ -203,9 +200,7 @@ hardware_interface::return_type ros2_control_demo_example_17 ::MecanumWheelBotSy
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
 
   // Only lock and simulate latency when in async mode
-  std::unique_ptr<std::lock_guard<std::mutex>> lock = nullptr;
   if (is_async_) {
-    lock = std::make_unique<std::lock_guard<std::mutex>>(write_mutex_);
 
     // Simulate random latency in hardware communication
     std::random_device rd;

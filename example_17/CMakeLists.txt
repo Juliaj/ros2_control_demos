@@ -14,6 +14,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   pluginlib
   rclcpp
   rclcpp_lifecycle
+  mecanum_drive_controller
 )
 
 # Specify the required version of ros2_control
@@ -36,10 +37,12 @@ add_library(
   ros2_control_demo_example_17
   SHARED
   hardware/mecanumwheelbot_system.cpp
+  controller/mecanumwheelbot_controller.cpp
 )
 target_compile_features(ros2_control_demo_example_17 PUBLIC cxx_std_17)
 target_include_directories(ros2_control_demo_example_17 PUBLIC
 $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/hardware/include>
+$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/controller/include>
 $<INSTALL_INTERFACE:include/ros2_control_demo_example_17>
 )
 ament_target_dependencies(
@@ -47,12 +50,14 @@ ament_target_dependencies(
   ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 
-# Export hardware plugins
+# Export hardware plugin
 pluginlib_export_plugin_description_file(hardware_interface ros2_control_demo_example_17.xml)
+# Export controller plugin
+pluginlib_export_plugin_description_file(controller_interface ros2_control_demo_example_17.xml)
 
 # INSTALL
 install(
-  DIRECTORY hardware/include/
+  DIRECTORY hardware/include/ controller/include/
   DESTINATION include/ros2_control_demo_example_17
 )
 install(
@@ -63,7 +68,8 @@ install(
   DIRECTORY bringup/launch bringup/config
   DESTINATION share/ros2_control_demo_example_17
 )
-install(TARGETS ros2_control_demo_example_17
+install(TARGETS 
+  ros2_control_demo_example_17
   EXPORT export_ros2_control_demo_example_17
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -81,5 +87,5 @@ endif()
 
 ## EXPORTS
 ament_export_targets(export_ros2_control_demo_example_17 HAS_LIBRARY_TARGET)
-ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
+ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS} ${CONTROLLER_INCLUDE_DEPENDS})
 ament_package()

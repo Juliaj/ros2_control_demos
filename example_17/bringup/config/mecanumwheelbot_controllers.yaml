@@ -7,41 +7,40 @@ controller_manager:
       type: joint_state_broadcaster/JointStateBroadcaster
     
     mecanum_drive_controller:
-      type: mecanum_drive_controller/MecanumDriveController
-    
-    use_diagnostics: true
-    diagnostics_frequency: 10
-    diagnostics:
-      threshold:
-        controller_manager:
-          periodicity:
-            mean_error:
-              error: 10.0
-              warn: 5.0
-            standard_deviation:
-              error: 10.0
-              warn: 5.0
-        controllers:
-          execution_time:
-            mean_error:
-              error: 2000.0
-              warn: 1000.0
-            standard_deviation:
-              error: 200.0
-              warn: 100.0
-          periodicity:
-            mean_error:
-              error: 10.0
-              warn: 5.0
-            standard_deviation:
-              error: 10.0
-              warn: 5.0
+      # type: mecanum_drive_controller/MecanumDriveController
+      type: ros2_control_demo_example_17/MecanumWheelBotController
+    # use_diagnostics: true
+    # diagnostics_frequency: 10
+    # diagnostics:
+    #   threshold:
+    #     controller_manager:
+    #       periodicity:
+    #         mean_error:
+    #           error: 10.0
+    #           warn: 5.0
+    #         standard_deviation:
+    #           error: 10.0
+    #           warn: 5.0
+    #     controllers:
+    #       execution_time:
+    #         mean_error:
+    #           error: 2000.0
+    #           warn: 1000.0
+    #         standard_deviation:
+    #           error: 200.0
+    #           warn: 100.0
+    #       periodicity:
+    #         mean_error:
+    #           error: 10.0
+    #           warn: 5.0
+    #         standard_deviation:
+    #           error: 10.0
+    #           warn: 5.0
     
 
 mecanum_drive_controller:
   ros__parameters:
-    
-    # is_async: true
+    is_async: true
     update_rate: 20  # Hz
     reference_timeout: 5.0
 
