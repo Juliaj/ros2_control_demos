@@ -76,6 +76,11 @@ install(TARGETS
   RUNTIME DESTINATION bin
 )
 
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
@@ -89,3 +94,8 @@ endif()
 ament_export_targets(export_ros2_control_demo_example_17 HAS_LIBRARY_TARGET)
 ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS} ${CONTROLLER_INCLUDE_DEPENDS})
 ament_package()
+
+include_directories(
+  include
+  ${mecanum_drive_controller_INCLUDE_DIRS}
+)

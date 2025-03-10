@@ -27,11 +27,16 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
+
 using config_type = controller_interface::interface_configuration_type;
 
 namespace ros2_control_demo_example_17
 { 
-MecanumWheelBotController::MecanumWheelBotController() : mecanum_drive_controller::MecanumDriveController() {}
+MecanumWheelBotController::MecanumWheelBotController() 
+: mecanum_drive_controller::MecanumDriveController(),
+  gen_(rd_()),
+  dist_(0.0, 1.0)  // Range from 0.0 to 1.0
+{}
 
 controller_interface::CallbackReturn MecanumWheelBotController::on_configure(
   const rclcpp_lifecycle::State & previous_state)
@@ -42,33 +47,68 @@ controller_interface::CallbackReturn MecanumWheelBotController::on_configure(
     return result;
   }
 
-  // Read the async parameter
+  // Declare parameters here
+  constexpr double DEFAULT_DELAY = 0.0;
+  this->get_node()->declare_parameter<double>("simulated_delay_min", DEFAULT_DELAY);
+  this->get_node()->declare_parameter<double>("simulated_delay_max", DEFAULT_DELAY);
+  this->get_node()->declare_parameter<bool>("trigger_exception", false);
+
+  // Read the custom parameters
   try {
-    // Get the parameter value
-    is_async_ = this->get_node()->get_parameter("is_async").as_bool();
-    
-    RCLCPP_INFO(this->get_node()->get_logger(), "MecanumWheelbotController operating in %s mode", is_async_ ? "async" : "sync");
+    // Get the custom parameters
+    simulated_delay_min_ = this->get_node()->get_parameter("simulated_delay_min").as_double();
+    simulated_delay_max_ = this->get_node()->get_parameter("simulated_delay_max").as_double();
+    RCLCPP_INFO(this->get_node()->get_logger(), "Simulated delay min: %f, max: %f", simulated_delay_min_, simulated_delay_max_);
       
+    if (simulated_delay_min_ < 0 || simulated_delay_max_ < 0) {
+        RCLCPP_ERROR(this->get_node()->get_logger(), "Delay values cannot be negative");
+        return controller_interface::CallbackReturn::ERROR;
+    }
+
+    if (simulated_delay_min_ > simulated_delay_max_) {
+        RCLCPP_ERROR(this->get_node()->get_logger(), "Minimum delay cannot be greater than maximum delay");
+        return controller_interface::CallbackReturn::ERROR;
+    }
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_node()->get_logger(), "Exception thrown during parameter retrieval: %s", e.what());
     return controller_interface::CallbackReturn::ERROR;
   }
 
+  trigger_exception_flag_ = this->get_node()->get_parameter("trigger_exception").as_bool();
+
+  // add callback function for the custom parameters
+  simulated_delay_min_sub_ = this->get_node()->create_subscription<std_msgs::msg::Float32>(
+    "simulated_delay_min", 10, [this](const std_msgs::msg::Float32::SharedPtr msg) {
+      this->simulated_delay_min_callback(msg);
+    });
+  simulated_delay_max_sub_ = this->get_node()->create_subscription<std_msgs::msg::Float32>(
+    "simulated_delay_max", 10, [this](const std_msgs::msg::Float32::SharedPtr msg) {
+      this->simulated_delay_max_callback(msg);
+    });
+
+  RCLCPP_INFO(this->get_node()->get_logger(), "MecanumwWheelBotController configured successfully.");
   return controller_interface::CallbackReturn::SUCCESS;
+}
+
+// add callback function for the custom parameters
+void MecanumWheelBotController::simulated_delay_min_callback(const std_msgs::msg::Float32::SharedPtr msg) {
+  simulated_delay_min_ = static_cast<double>(msg->data);
+}
+
+void MecanumWheelBotController::simulated_delay_max_callback(const std_msgs::msg::Float32::SharedPtr msg) {
+  simulated_delay_max_ = static_cast<double>(msg->data);
 }
 
 controller_interface::return_type MecanumWheelBotController::update_and_write_commands(
   const rclcpp::Time & time, const rclcpp::Duration & period)
 {
-  // If the controller is async, simulate the delay
-  if (is_async_) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> latency_dist(MIN_LATENCY_MS, MAX_LATENCY_MS);
-    auto latency = std::chrono::milliseconds(latency_dist(gen));
+  // Simulate the delay if the custom parameters are set
+  if (simulated_delay_min_ > 0.0 || simulated_delay_max_ > 0.0) {
+    std::uniform_int_distribution<> latency_dist(simulated_delay_min_, simulated_delay_max_);
+    auto latency = std::chrono::milliseconds(latency_dist(gen_));
     
-    if (latency.count() >= 25) {
-      RCLCPP_INFO(this->get_node()->get_logger(), "Controller update latency is high: %ldms", latency.count());
+    if (latency.count() == simulated_delay_max_) {
+      RCLCPP_INFO(this->get_node()->get_logger(), "Added high delay: %ldms. Delay is at max", latency.count());
     }
     std::this_thread::sleep_for(latency);
   }
@@ -79,6 +119,20 @@ controller_interface::return_type MecanumWheelBotController::update_and_write_co
     return ret;
   }
   
+  // Trigger exception if the flag is set randomly
+  if (trigger_exception_flag_) {
+    // Generate a random number between 0.0 and 1.0
+    double random_value_for_exception = dist_(gen_);
+    
+    // Set a threshold for triggering the exception (e.g., 0.01 = 1% chance)
+    const double EXCEPTION_THRESHOLD = 0.01;
+    
+    if (random_value_for_exception < EXCEPTION_THRESHOLD) {
+        RCLCPP_ERROR(this->get_node()->get_logger(), "Triggering exception (random value: %f)", random_value_for_exception  );
+        throw std::runtime_error("Exception triggered randomly");
+    }
+  }
+
   return controller_interface::return_type::OK;
 }
 

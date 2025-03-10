@@ -2,11 +2,16 @@
 
 .. _ros2_control_demos_example_17_userdoc:
 
-************
-MecanumWheelBot
-************
+************************************************************************
+MecanumWheelBot running with asynchronous controller and hardware
+************************************************************************
 
-*MecanumWheelBot* is a simple mobile base using bicycle model with 4 wheels.
+In this example, we illustrate key concepts of the ros2_control framework, particularly the controller manager, asynchronous controllers, and asynchronous hardware interfaces. *MecanumWheelBot* is a simple mobile base using bicycle model with 4 wheels. 
+
+An asynchronous controller is a controller that for some reason cannot (or we don't want to) perform the operations needed in an update() call.
+
+
+For instance if ros control is running at 100Hz, the sum of the execution time of all controllers update() calls must be below 10ms. If a controller requires 15ms it cannot be executed synchronously without affecting the whole ros control update rate.
 
 This example shows how to use the bicycle steering controller, which is a sub-design of the steering controller library.
 
@@ -24,88 +29,218 @@ The *MecanumWheelBot* URDF files can be found in ``ros2_control_demo_description
 Tutorial steps
 --------------------------
 
-1. To check that *MecanumWheelBot* description is working properly use following launch commands
+.. code-block:: shell
 
-   .. code-block:: shell
+   # set delay 
+   ros2 topic pub -1 /simulated_delay_max std_msgs/msg/Float32 "data: 50.0"
 
-    ros2 launch ros2_control_demo_example_17 view_robot.launch.py
+   # set delay 
+   ros2 topic pub -1 /simulated_delay_min std_msgs/msg/Float32 "data: 50.0"
 
-   .. warning::
-    Getting the following output in terminal is OK: ``Warning: Invalid frame ID "odom" passed to canTransform argument target_frame - frame does not exist``.
-    This happens because ``joint_state_publisher_gui`` node needs some time to start.
+   # set exception
+   ros2 topic pub -1 /trigger_exception std_msgs/msg/Bool "data: true"
 
-   .. image:: MecanumWheelBot.png
-    :width: 400
-    :alt: Carlike Mobile Robot
+Mecanum Robot Demonstration: Controller Manager and Asynchronous Components
+==========================================================================
 
-2. To start *MecanumWheelBot* example open a terminal, source your ROS2-workspace and execute its launch file with
-
-   .. code-block:: shell
-
-    ros2 launch ros2_control_demo_example_17 mecanumwheelbot.launch.py remap_odometry_tf:=true
-
-   The launch file loads and starts the robot hardware, controllers and opens *RViz*.
-   In the starting terminal you will see a lot of output from the hardware implementation showing its internal states.
-   This excessive printing is only added for demonstration. In general, printing to the terminal should be avoided as much as possible in a hardware interface implementation.
-
-   If you can see an orange box with four wheels in *RViz* everything has started properly.
-
-   .. note::
-
-    For robots being fixed to the world frame, like the RRbot examples of this repository, the ``robot_state_publisher`` subscribes to the ``/joint_states`` topic and creates the TF tree. For mobile robots, we need a node publishing the TF tree including the pose of the robot in the world coordinate systems. The most simple one is the odometry calculated by the ``bicycle_steering_controller``.
-
-   By default, the controller publishes the odometry of the robot to the ``~/tf_odometry`` topic. The ``remap_odometry_tf`` argument is used to remap the odometry TF to the ``/tf`` topic. If you set this argument to ``false`` (or not set it at all) the TF tree will not be updated with the odometry data.
-
-3. Now, let's introspect the control system before moving *MecanumWheelBot*. Check if the hardware interface loaded properly, by opening another terminal and executing
-
-   .. code-block:: shell
-
-    ros2 control list_hardware_interfaces
-
-   You should get
-
-   .. code-block:: shell
+This demonstration showcases a robot with mecanum wheels to illustrate key concepts of the ros2_control framework, particularly the controller manager, asynchronous controllers, and asynchronous hardware interfaces.
 
 
+Scenario 1: Synchronous Controller with Synchronous Hardware
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   The ``[claimed]`` marker on command interfaces means that a controller has access to command *MecanumWheelBot*.
+This baseline scenario uses the default synchronous setup.
 
-4. Check if controllers are running
+**Configuration:**
 
-   .. code-block:: shell
+.. code-block:: yaml
 
-    ros2 control list_controllers
+   mecanum_controller:
+     ros__parameters:
+       is_async: false
+       
+   mecanum_robot_hardware:
+     ros__parameters:
+       is_async: false
+       update_rate: 100.0  # Same as controller manager
 
-   You should get
+**Behavior:**
 
-   .. code-block:: shell
+* The controller manager thread runs at 100Hz
+* In each cycle, the read-update-write operations happen sequentially
+* If any operation takes too long, the entire control loop is delayed
+* Suitable for simple robots with predictable computation times
 
-    joint_state_broadcaster[joint_state_broadcaster/JointStateBroadcaster] active
-    bicycle_steering_controller[bicycle_steering_controller/BicycleSteeringController] active
+**Implementation Tip:**
 
-5. If everything is fine, now you can send a command to *bicycle_steering_controller* using ROS 2 CLI:
+Monitor loop timing with:
 
-   .. code-block:: shell
+.. code-block:: bash
 
-    ros2 topic pub --rate 30 /mecanum_drive_controller/reference geometry_msgs/msg/TwistStamped "
-      header:
-        stamp:
-          sec: $(date +%s)
-          nanosec: 0
-      twist:
-        linear:
-          x: 0.7
-          y: 0.0
-          z: 0.0
-        angular:
-          x: 0.0
-          y: 0.0
-          z: 1.0"
+   ros2 topic echo /controller_manager/statistics
 
-   You should now see an orange box circling in *RViz*.
-   Also, you should see changing states in the terminal where launch file is started.
+Scenario 2: Asynchronous Controller with Synchronous Hardware
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   .. code-block:: shell
+This scenario demonstrates how to offload complex controller calculations.
+
+**Configuration:**
+
+.. code-block:: yaml
+
+   mecanum_controller:
+     ros__parameters:
+       is_async: true
+       update_rate: 50.0  # Lower than the controller manager
+       
+   mecanum_robot_hardware:
+     ros__parameters:
+       is_async: false
+
+**Behavior:**
+
+* The hardware interface is read/written in the main controller manager thread
+* The mecanum controller runs calculations in a separate thread at 50Hz
+* The main control loop doesn't block waiting for controller calculations
+* Useful when the controller performs complex operations like dynamic obstacle avoidance
+
+**Implementation:**
+
+Add processing delay to simulate complex controller calculations:
+
+.. code-block:: cpp
+
+   // In MecanumDriveController::update
+   if (is_async_) {
+     // Simulate complex computation in async controller
+     std::this_thread::sleep_for(std::chrono::milliseconds(15));
+   }
+
+Scenario 3: Synchronous Controller with Asynchronous Hardware
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This scenario demonstrates handling hardware with variable communication times.
+
+**Configuration:**
+
+.. code-block:: yaml
+
+   mecanum_controller:
+     ros__parameters:
+       is_async: false
+       
+   mecanum_robot_hardware:
+     ros__parameters:
+       is_async: true
+       update_rate: 200.0  # Higher than controller manager
+
+**Behavior:**
+
+* Hardware communication runs in its own thread at 200Hz
+* The controller manager reads the latest data available but doesn't block waiting for hardware
+* The mecanum controller executes in the main thread
+* Useful for hardware with variable communication latencies (CAN bus, network-connected devices)
+
+**Implementation:**
+
+Create an asynchronous hardware thread:
+
+.. code-block:: cpp
+
+   // In MecanumRobotHardware::on_activate
+   if (is_async_) {
+     running_ = true;
+     async_thread_ = std::thread([this]() {
+       rclcpp::Rate rate(update_rate_);
+       while (running_) {
+         auto start = std::chrono::steady_clock::now();
+         
+         // Simulate variable communication time
+         std::this_thread::sleep_for(
+           std::chrono::milliseconds(random_between(1, 8)));
+         
+         {
+           std::lock_guard<std::mutex> guard(io_mutex_);
+           // Update hw_positions_ and hw_velocities_ based on hw_commands_
+         }
+         
+         rate.sleep();
+       }
+     });
+   }
+
+Scenario 4: Fully Asynchronous System
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This scenario demonstrates a system with both asynchronous hardware and controllers.
+
+**Configuration:**
+
+.. code-block:: yaml
+
+   mecanum_controller:
+     ros__parameters:
+       is_async: true
+       update_rate: 50.0
+       
+   mecanum_robot_hardware:
+     ros__parameters:
+       is_async: true
+       update_rate: 200.0
+       thread_priority: 0  # Highest priority
+
+**Behavior:**
+
+* Hardware interface runs in highest priority thread (0) at 200Hz
+* Mecanum controller runs in medium priority thread at 50Hz
+* Controller manager thread coordinates but doesn't block on either component
+* Allows for optimal resource utilization in complex systems
+
+**Implementation Challenges:**
+
+* Proper mutex handling to avoid deadlocks
+* Clear priority hierarchy to prevent priority inversion
+* Careful resource management to avoid thread contention
+
+Best Practices and Recommendations
+---------------------------------
+
+**When to Use Synchronous Components**
+
+* Simple systems with predictable computation times
+* When deterministic timing is critical
+* For controllers requiring tight coupling with hardware timing
+* During initial development for easier debugging
+
+**When to Use Asynchronous Controllers**
+
+* For controllers with computationally intensive algorithms
+* When the controller runs at a lower frequency than the hardware
+* For non-critical controllers that can tolerate some timing variation
+* To prevent complex controllers from blocking the main control loop
+
+**When to Use Asynchronous Hardware**
+
+* For hardware with variable communication latencies
+* When hardware operates at a different frequency than controllers
+* For devices requiring their own update rhythms (cameras, LIDAR)
+* When hardware operations might occasionally block or timeout
+
+**Priority Considerations**
+
+* Hardware interfaces: Highest priority (0-10)
+* Critical controllers: Medium-high priority (20-30)
+* Controller manager: Medium priority (50)
+* Non-critical controllers: Lower priority (60-80)
+
+**Debugging Asynchronous Systems**
+
+* Use controller manager statistics to monitor timing
+* Add detailed logging with timing information
+* Consider temporary synchronous operation during initial debugging
+* Monitor thread CPU usage to identify bottlenecks
+
+This demonstration provides a practical example of how the controller manager orchestrates both synchronous and asynchronous components in a mecanum wheel robot, illustrating the flexibility and power of the ros2_control framework.
 
 
 

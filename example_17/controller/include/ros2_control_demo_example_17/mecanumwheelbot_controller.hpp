@@ -39,6 +39,8 @@
 #include "trajectory_msgs/msg/joint_trajectory.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 #include "mecanum_drive_controller/mecanum_drive_controller.hpp"
+#include "std_msgs/msg/float32.hpp"
+# include <random>
 
 namespace ros2_control_demo_example_17
 {
@@ -58,14 +60,26 @@ protected:
   // add is_active_flag
   bool is_active_flag_ = false;
   
-  // Add latency simulation parameters
-  static constexpr int MIN_LATENCY_MS = 0;   // Minimum latency in milliseconds
-  static constexpr int MAX_LATENCY_MS = 50;  // Maximum latency in milliseconds
-  
-  // Flag to enable/disable async behavior (latency simulation)
-  bool is_async_ = false;
-};
+  // custom parameters
+  double simulated_delay_min_ = 0.0;
+  double simulated_delay_max_ = 0.0;
 
+  // subscribe to the custom parameters
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr simulated_delay_min_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr simulated_delay_max_sub_;
+
+  // callback function for the custom parameters
+  void simulated_delay_min_callback(const std_msgs::msg::Float32::SharedPtr msg);
+  void simulated_delay_max_callback(const std_msgs::msg::Float32::SharedPtr msg);
+
+  // add trigger_exception_flag
+  bool trigger_exception_flag_ = false;
+
+private:
+  std::random_device rd_;
+  std::mt19937 gen_;
+  std::uniform_real_distribution<> dist_;
+};
 }  // namespace ros2_control_demo_example_17
 
 #endif  // ROS2_CONTROL_DEMO_EXAMPLE_17__MECANUMWHEELBOT_CONTROLLER_HPP_

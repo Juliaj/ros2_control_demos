@@ -125,8 +125,8 @@ def generate_launch_description():
         package="rviz2",
         executable="rviz2",
         name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
+        output="screen",
+        arguments=["-d", rviz_config_file,],
         condition=IfCondition(gui),
     )
 
@@ -150,12 +150,6 @@ def generate_launch_description():
         condition=IfCondition(remap_odometry_tf),
     )
 
-    robot_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["mecanum_drive_controller", "--param-file", robot_controllers],
-        condition=UnlessCondition(remap_odometry_tf),
-    )
 
     # Delay rviz start after `joint_state_broadcaster`
     delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
@@ -175,35 +169,33 @@ def generate_launch_description():
     )
     delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=robot_controller_spawner,
+            target_action=robot_controller_spawner_remapped,
             on_exit=[joint_state_broadcaster_spawner],
         )
     )
 
     # launch diagnostic aggregator
-    # diagnostic_aggregator_config = PathJoinSubstitution(
-    #     [FindPackageShare("ros2_control_demo_example_17"), "config", "analyzers_config.yaml"]
-    # )
+    diagnostic_aggregator_config = PathJoinSubstitution(
+        [FindPackageShare("ros2_control_demo_example_17"), "config", "analyzers_config.yaml"]
+    )
 
-    # diagnostic_aggregator_node = Node(
-    #     package="diagnostic_aggregator",
-    #     executable="aggregator_node",
-    #     parameters=[diagnostic_aggregator_config],
-    # )
+    diagnostic_aggregator_node = Node(
+        package="diagnostic_aggregator",
+        executable="aggregator_node",
+        parameters=[diagnostic_aggregator_config],
+    )
 
     # launch rqt_robot_monitor if it is installed 
-    # rqt_robot_monitor_node = Node(
-    #     package="rqt_robot_monitor",
-    #     executable="rqt_robot_monitor", 
-    # )
+    rqt_robot_monitor_node = Node(
+        package="rqt_robot_monitor",
+        executable="rqt_robot_monitor", 
+    )
 
     nodes = [
         control_node,
         robot_state_pub_node,
         robot_controller_spawner_remapped,
-        robot_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner_remapped,
-        delay_joint_state_broadcaster_after_robot_controller_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         # diagnostic_aggregator_node,
         # rqt_robot_monitor_node,

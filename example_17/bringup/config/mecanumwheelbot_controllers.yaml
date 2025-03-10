@@ -1,41 +1,38 @@
 controller_manager:
   ros__parameters:
-    update_rate: 40  # Hz
+    update_rate: 100  # Hz
     update_rate_offset: 0.05
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
     
     mecanum_drive_controller:
-      # type: mecanum_drive_controller/MecanumDriveController
       type: ros2_control_demo_example_17/MecanumWheelBotController
-    # use_diagnostics: true
-    # diagnostics_frequency: 10
-    # diagnostics:
-    #   threshold:
-    #     controller_manager:
-    #       periodicity:
-    #         mean_error:
-    #           error: 10.0
-    #           warn: 5.0
-    #         standard_deviation:
-    #           error: 10.0
-    #           warn: 5.0
-    #     controllers:
-    #       execution_time:
-    #         mean_error:
-    #           error: 2000.0
-    #           warn: 1000.0
-    #         standard_deviation:
-    #           error: 200.0
-    #           warn: 100.0
-    #       periodicity:
-    #         mean_error:
-    #           error: 10.0
-    #           warn: 5.0
-    #         standard_deviation:
-    #           error: 10.0
-    #           warn: 5.0
+    diagnostics:
+      threshold:
+        controller_manager:
+          periodicity:
+            mean_error:
+              error: 10.0
+              warn: 5.0
+            standard_deviation:
+              error: 10.0
+              warn: 5.0
+        controllers:
+          execution_time:
+            mean_error:
+              error: 2000.0
+              warn: 1000.0
+            standard_deviation:
+              error: 200.0
+              warn: 100.0
+          periodicity:
+            mean_error:
+              error: 10.0
+              warn: 5.0
+            standard_deviation:
+              error: 10.0
+              warn: 5.0
     
 
 mecanum_drive_controller:
@@ -44,6 +41,11 @@ mecanum_drive_controller:
     update_rate: 20  # Hz
     reference_timeout: 5.0
 
+    # custom parameters for testing
+    simulated_delay_min: 45.0
+    simulated_delay_max: 48.0
+    trigger_exception: true
+
     front_left_wheel_command_joint_name: "front_left_wheel_joint"
     front_right_wheel_command_joint_name: "front_right_wheel_joint"
     rear_right_wheel_command_joint_name: "rear_right_wheel_joint"
@@ -51,8 +53,11 @@ mecanum_drive_controller:
 
     kinematics:
       base_frame_offset: { x: 0.0, y: 0.0, theta: 0.0 }
-      wheels_radius: 0.5
-      sum_of_robot_center_projection_on_X_Y_axis: 1.0
+      # based on urdf 
+      wheels_radius: 0.05
+      # based on urdf , L=0.325/2=0.1625 meters, W=0.260/2=0.13 meters
+      # The sum of robot center projection would be: L+W=0.1625+0.13=0.2925 meters
+      sum_of_robot_center_projection_on_X_Y_axis: 0.2925
 
     base_frame_id: "base_link"
     odom_frame_id: "odom"
