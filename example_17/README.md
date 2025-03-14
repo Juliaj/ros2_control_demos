@@ -1,6 +1,8 @@
 # ros2_control_demo_example_17
 
-   *MecanumWheelBot*, or ''Carlike Mobile Robot'', is a simple mobile base with bicycle drive.
-   The robot has two wheels in the front that steer the robot and two wheels in the back that power the robot forward and backwards. However, since each pair of wheels (steering and traction) are controlled by one interface, a bicycle steering model is used.
+   *MecanumWheelBot* uses  
+   
+   In this example, we illustrate key concepts of the ros2_control framework, particularly the controller manager, asynchronous controllers, and asynchronous hardware interfaces. *MecanumWheelBot* is a simple mobile base using 4 mecanum wheels. 
+
 
 Find the documentation in [doc/userdoc.rst](doc/userdoc.rst) or on [control.ros.org](https://control.ros.org/master/doc/ros2_control_demos/example_17/doc/userdoc.html).
