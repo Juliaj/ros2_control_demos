@@ -75,10 +75,12 @@ protected:
   // add trigger_exception_flag
   bool trigger_exception_flag_ = false;
 
+  std::uniform_real_distribution<double> dist_;
+  std::uniform_real_distribution<double> latency_dist;
+
 private:
   std::random_device rd_;
   std::mt19937 gen_;
-  std::uniform_real_distribution<> dist_;
 };
 }  // namespace ros2_control_demo_example_17
 

@@ -58,7 +58,7 @@ struct Joint
 class MecanumWheelBotSystemHardware : public hardware_interface::SystemInterface
 {
 public:
-  RCLCPP_SHARED_PTR_DEFINITIONS(MecanumWheelBotSystemHardware);
+  RCLCPP_SHARED_PTR_DEFINITIONS(MecanumWheelBotSystemHardware)
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareInfo & info) override;

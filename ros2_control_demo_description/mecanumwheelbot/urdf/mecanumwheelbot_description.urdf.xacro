@@ -15,6 +15,10 @@
   <xacro:property name="wheel_radius" value="0.05" />
   <!-- <xacro:property name="wheeltrack" value="" -->
 
+  <!-- Define common wheel properties -->
+  <xacro:property name="wheel_effort_limit" value="10.0"/>
+  <xacro:property name="wheel_velocity_limit" value="5.0"/>
+
   <!-- Base Link -->
   <link name="${prefix}base_link" />
 
@@ -54,11 +58,8 @@
       <dynamics damping="0.2"/>
     </joint>
 
-
     <!-- rear wheels -->
-
     <!-- rear right wheel -->
-
     <link name="${prefix}rear_right_wheel">
       <collision>
         <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
@@ -66,7 +67,6 @@
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
       </collision>
-
       <visual>
         <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/> -->
         <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
@@ -76,7 +76,6 @@
         </geometry>
         <material name="black"/>
       </visual>
-
       <inertial>
         <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
         <mass value="${wheel_mass}"/>
@@ -87,14 +86,13 @@
       </inertial>
 
     </link>
-
-    <joint name="${prefix}rear_right_wheel_joint" type="continuous">
+    <joint name="${prefix}rear_right_wheel_joint" type="revolute">
       <parent link="${prefix}chassis_link"/>
       <child link="${prefix}rear_right_wheel"/>
       <origin xyz="-${wheelbase/2} ${base_width/2} -${base_height/2}" rpy="0 0 ${PI/2}"/>
       <!-- Rollers angled +45° (forward and outward) -->
       <axis xyz="1 1 0"/>
-      <limit effort="100.0" velocity="100.0"/>
+      <limit effort="${wheel_effort_limit}" velocity="${wheel_velocity_limit}"/>
       <dynamics damping="0.2"/>
     </joint>
 
@@ -106,7 +104,6 @@
             <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
           </geometry>
         </collision>
-
         <visual>
           <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/> -->
           <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
@@ -116,7 +113,6 @@
           </geometry>
           <material name="black"/>
         </visual>
-
         <inertial>
           <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
           <mass value="${wheel_mass}"/>
@@ -125,33 +121,26 @@
             iyy="0.000270" iyz="0.0"
             izz="0.000426"/>
         </inertial>
-
     </link>
-
-    <joint name="${prefix}rear_left_wheel_joint" type="continuous">
+    <joint name="${prefix}rear_left_wheel_joint" type="revolute">
       <parent link="${prefix}chassis_link" />
       <child link="${prefix}rear_left_wheel" />
       <origin xyz="-${wheelbase/2} -${base_width/2} -${base_height/2}" rpy="0 0 ${PI/2}"/>
       <!-- Rollers angled -45° (forward and inward) -->
       <axis xyz="1 -1 0"/> 
-      <limit effort="100.0" velocity="100.0"/>
+      <limit effort="${wheel_effort_limit}" velocity="${wheel_velocity_limit}"/>
       <dynamics damping="0.2"/>
     </joint>
 
     <!-- front wheels -->
-
-    <!-- front right wheel -->
-
-
+    <!-- front right wheel-->
     <link name="${prefix}front_right_wheel">
-
       <collision>
         <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
         <geometry>
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
       </collision>
-
       <visual>
         <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>   -->
         <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
@@ -161,7 +150,6 @@
         </geometry>
         <material name="black"/>
       </visual>
-
       <inertial>
         <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
         <mass value="${wheel_mass}"/>
@@ -171,20 +159,17 @@
           izz="0.000426"/>
       </inertial>
     </link>
-
     <joint name="${prefix}front_right_wheel_joint" type="revolute">
       <parent link="${prefix}chassis_link" />
       <child link="${prefix}front_right_wheel" />
       <origin xyz="${wheelbase/2} ${base_width/2} -${base_height/2}" rpy="0 0 ${PI/2}"/>
       <!-- Rollers angled -45° (forward and inward) -->
       <axis xyz="1 -1 0"/>
-      <limit lower="-0.4" upper="0.4" effort="100.0" velocity="0.0"/>
+      <limit lower="-0.4" upper="0.4" effort="${wheel_effort_limit}" velocity="${wheel_velocity_limit}"/>
       <dynamics damping="0.2"/>
     </joint>
 
-    <!-- front left steering -->
-
-
+    <!-- front left wheel -->
     <link name="${prefix}front_left_wheel">
       <collision>
         <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
@@ -213,14 +198,13 @@
       </inertial>
 
     </link>
-
     <joint name="${prefix}front_left_wheel_joint" type="revolute">
       <parent link="${prefix}chassis_link" />
       <child link="${prefix}front_left_wheel" />
       <origin xyz="${wheelbase/2} -${base_width/2} -${base_height/2}" rpy="0 0 ${PI/2}"/>
       <!-- Rollers angled +45° (forward and outward) -->
       <axis xyz="1 1 0"/>
-      <limit lower="-0.4" upper="0.4" effort="100.0" velocity="0.0"/>
+      <limit lower="-0.4" upper="0.4" effort="${wheel_effort_limit}" velocity="${wheel_velocity_limit}"/>
       <dynamics damping="0.2"/>
     </joint>
 

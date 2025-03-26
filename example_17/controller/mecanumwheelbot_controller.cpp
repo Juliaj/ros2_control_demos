@@ -35,7 +35,8 @@ namespace ros2_control_demo_example_17
 MecanumWheelBotController::MecanumWheelBotController() 
 : mecanum_drive_controller::MecanumDriveController(),
   gen_(rd_()),
-  dist_(0.0, 1.0)  // Range from 0.0 to 1.0
+  dist_(0.0, 1.0),  // Range from 0.0 to 1.0
+  latency_dist(0.0, 0.0)  // Initial values, will be updated later
 {}
 
 controller_interface::CallbackReturn MecanumWheelBotController::on_configure(
@@ -48,9 +49,9 @@ controller_interface::CallbackReturn MecanumWheelBotController::on_configure(
   }
 
   // Declare parameters here
-  constexpr double DEFAULT_DELAY = 0.0;
-  this->get_node()->declare_parameter<double>("simulated_delay_min", DEFAULT_DELAY);
-  this->get_node()->declare_parameter<double>("simulated_delay_max", DEFAULT_DELAY);
+  constexpr double DEAULT_DELAY = 0.0;
+  this->get_node()->declare_parameter<double>("simulated_delay_min", DEAULT_DELAY);
+  this->get_node()->declare_parameter<double>("simulated_delay_max", DEAULT_DELAY);
   this->get_node()->declare_parameter<bool>("trigger_exception", false);
 
   // Read the custom parameters
@@ -103,11 +104,11 @@ controller_interface::return_type MecanumWheelBotController::update_and_write_co
   const rclcpp::Time & time, const rclcpp::Duration & period)
 {
   // Simulate the delay if the custom parameters are set
-  if (simulated_delay_min_ > 0.0 || simulated_delay_max_ > 0.0) {
-    std::uniform_int_distribution<> latency_dist(simulated_delay_min_, simulated_delay_max_);
-    auto latency = std::chrono::milliseconds(latency_dist(gen_));
+  if (simulated_delay_min_ > 0 || simulated_delay_max_ > 0) {
+    latency_dist = std::uniform_real_distribution<double>(simulated_delay_min_, simulated_delay_max_);
+    auto latency = std::chrono::milliseconds(static_cast<int>(latency_dist(gen_)));
     
-    if (latency.count() == simulated_delay_max_) {
+    if (std::abs(static_cast<double>(latency.count()) - simulated_delay_max_) < 1e-6) {
       RCLCPP_INFO(this->get_node()->get_logger(), "Added high delay: %ldms. Delay is at max", latency.count());
     }
     std::this_thread::sleep_for(latency);
