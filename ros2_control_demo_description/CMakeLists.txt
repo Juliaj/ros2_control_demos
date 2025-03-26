@@ -19,7 +19,7 @@ install(
 )
 
 install(
-  DIRECTORY mecanumwheelbot/urdf mecanumwheelbot/rviz
+  DIRECTORY mecanumwheelbot/meshes mecanumwheelbot/urdf mecanumwheelbot/rviz
   DESTINATION share/${PROJECT_NAME}/mecanumwheelbot
 )
 

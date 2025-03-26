@@ -68,9 +68,11 @@
       </collision>
 
       <visual>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
+        <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/> -->
+        <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
         <geometry>
-          <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+          <!-- <cylinder length="${wheel_len}" radius="${wheel_radius}"/> -->
+          <mesh filename="package://ros2_control_demo_description/mecanumwheelbot/meshes/visual/rear_right.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="black"/>
       </visual>
@@ -106,9 +108,11 @@
         </collision>
 
         <visual>
-          <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
+          <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/> -->
+          <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
           <geometry>
-            <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+            <!-- <cylinder length="${wheel_len}" radius="${wheel_radius}"/> -->
+            <mesh filename="package://ros2_control_demo_description/mecanumwheelbot/meshes/visual/front_right.stl" scale="0.001 0.001 0.001"/>
           </geometry>
           <material name="black"/>
         </visual>
@@ -149,9 +153,11 @@
       </collision>
 
       <visual>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
+        <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>   -->
+        <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
         <geometry>
-          <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+          <!-- <cylinder length="${wheel_len}" radius="${wheel_radius}"/> -->
+          <mesh filename="package://ros2_control_demo_description/mecanumwheelbot/meshes/visual/front_right.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="black"/>
       </visual>
@@ -188,9 +194,11 @@
       </collision>
 
       <visual>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/>
+        <!-- <origin xyz="0 0 0" rpy="${PI/2} 0 ${PI/2}"/> -->
+        <origin xyz="0 0 0" rpy="0 0 ${PI/2}"/>
         <geometry>
-          <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+          <!-- <cylinder length="${wheel_len}" radius="${wheel_radius}"/> -->
+          <mesh filename="package://ros2_control_demo_description/mecanumwheelbot/meshes/visual/rear_right.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="black"/>
       </visual>
