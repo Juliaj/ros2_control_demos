@@ -176,12 +176,12 @@ def generate_launch_description():
         )
     )
 
-    delay_robot_base_after_pid_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=pid_controllers_spawner,
-            on_exit=[robot_base_controller_spawner],
-        )
-    )
+    # delay_robot_base_after_pid_controller_spawner = RegisterEventHandler(
+    #     event_handler=OnProcessExit(
+    #         target_action=pid_controllers_spawner,
+    #         on_exit=[robot_base_controller_spawner],
+    #     )
+    # )
 
     # Delay start of joint_state_broadcaster after `robot_base_controller`
     # TODO(anyone): This is a workaround for flaky tests. Remove when fixed.
@@ -198,8 +198,9 @@ def generate_launch_description():
         gazebo_bridge,
         gz_spawn_entity,
         robot_state_pub_node,
-        pid_controllers_spawner,
-        delay_robot_base_after_pid_controller_spawner,
+        # pid_controllers_spawner,
+        # delay_robot_base_after_pid_controller_spawner,
+        robot_base_controller_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_joint_state_broadcaster_after_robot_base_controller_spawner,
     ]
