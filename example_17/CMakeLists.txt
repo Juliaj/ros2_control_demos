@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(ros2_control_demo_example_17)
 
+find_package(ament_cmake REQUIRED)
+
 # INSTALL
 install(
   DIRECTORY description/gazebo description/launch description/ros2_control description/urdf

@@ -34,10 +34,6 @@
 
     <!-- Link3 -->
     <gazebo reference="${prefix}right_wheel">
-:q!
-
-
-
       <mu1>1.0</mu1>
       <mu2>1.0</mu2>
       <material>
