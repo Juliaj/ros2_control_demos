@@ -26,11 +26,11 @@ wheel_pids:
       - left_wheel_joint
       - right_wheel_joint
 
-    command_interface: effort
+    command_interface: velocity
 
     reference_and_state_interfaces:
       - velocity
-      - effort
+      # - effort
 
     gains:
       # control the velocity through effort
