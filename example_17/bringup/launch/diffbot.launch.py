@@ -14,7 +14,7 @@
 
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, IncludeLaunchDescription, OpaqueFunction, GroupAction, LogInfo
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -23,13 +23,19 @@ from launch.substitutions import (
     FindExecutable,
     PathJoinSubstitution,
     LaunchConfiguration,
+    PythonExpression,
+    TextSubstitution,
 )
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from ament_index_python import get_package_share_directory
 
+from ros2_control_demo_example_17.launch_tools.substitutions import TextJoin
 
 def generate_launch_description():
+    example_pkg_share_dir = get_package_share_directory('ros2_control_demo_example_17')
+    
     # Declare arguments
     declared_arguments = []
     declared_arguments.append(
@@ -53,27 +59,21 @@ def generate_launch_description():
             description="Fixed frame id of the robot.",
         )
     )
+    
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            'world_name', default_value='rubicon.sdf', description='Name of the world to load.')
+    )
 
     # Initialize Arguments
     gui = LaunchConfiguration("gui")
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     fixed_frame_id = LaunchConfiguration("fixed_frame_id")
+    world_name = LaunchConfiguration("world_name")
 
-    # gazebo
-    gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
-        ),
-        launch_arguments=[("gz_args", " -r -v 3 empty.sdf")],
-        condition=IfCondition(gazebo_gui),
-    )
-    gazebo_headless = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
-        ),
-        launch_arguments=[("gz_args", ["--headless-rendering -s -r -v 3 empty.sdf"])],
-        condition=UnlessCondition(gazebo_gui),
-    )
+    # Obtains world path.
+    world_path = PathJoinSubstitution([example_pkg_share_dir, 'worlds', world_name])
+    log_world_path = LogInfo(msg=TextJoin(substitutions=["World path: ", world_path]))
 
     # Gazebo bridge
     gazebo_bridge = Node(
@@ -95,6 +95,29 @@ def generate_launch_description():
             "-z",
             "0.02",
         ],
+    )
+
+    # gazebo
+    gz_args = TextJoin(
+        substitutions=[
+            "-r -v 3",
+            world_path,
+        ],
+        separator=' ',
+    )
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
+        ),
+        launch_arguments={"gz_args": gz_args}.items(),
+        condition=IfCondition(gazebo_gui),
+    )
+    gazebo_headless = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
+        ),
+        launch_arguments=[("gz_args", ["--headless-rendering -s -r -v 3 ", world_path])],
+        condition=UnlessCondition(gazebo_gui),
     )
 
     # Get URDF via xacro
@@ -146,15 +169,15 @@ def generate_launch_description():
         ],
     )
 
-    pid_controllers_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "wheel_pids",
-            "--param-file",
-            robot_controllers,
-        ],
-    )
+    # pid_controllers_spawner = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=[
+    #         "wheel_pids",
+    #         "--param-file",
+    #         robot_controllers,
+    #     ],
+    # )
 
     robot_base_controller_spawner = Node(
         package="controller_manager",
@@ -194,7 +217,6 @@ def generate_launch_description():
 
     nodes = [
         gazebo,
-        gazebo_headless,
         gazebo_bridge,
         gz_spawn_entity,
         robot_state_pub_node,
@@ -204,5 +226,6 @@ def generate_launch_description():
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_joint_state_broadcaster_after_robot_base_controller_spawner,
     ]
+    
+    return LaunchDescription( declared_arguments + [log_world_path] + nodes ) 
 
-    return LaunchDescription(declared_arguments + nodes)

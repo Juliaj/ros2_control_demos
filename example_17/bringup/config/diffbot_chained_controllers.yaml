@@ -45,11 +45,13 @@ diffbot_base_controller:
     # left_wheel_names: ["wheel_pids/left_wheel_joint"]
     # right_wheel_names: ["wheel_pids/right_wheel_joint"]
 
-    left_wheel_names: ["left_wheel_joint"]
-    right_wheel_names: ["right_wheel_joint"]
+    left_wheel_names: ["rear_left_wheel_joint"]
+    right_wheel_names: ["rear_right_wheel_joint"]
 
-    wheel_separation: 0.10
-    wheel_radius: 0.015
+    wheel_separation: 0.5708
+    wheel_radius: 0.1651
+
+    # odom_publish_frequency: 100
 
     # we have velocity feedback
     position_feedback: false
