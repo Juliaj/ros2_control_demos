@@ -1,0 +1,49 @@
+controller_manager:
+  ros__parameters:
+    use_sim_time: True  # remove on real robots
+    update_rate: 100  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # wheel_pids:
+    #   type: pid_controller/PidController
+
+    mecanum_bot_base_controller:
+      # type: diff_drive_controller/DiffDriveController
+      type: mecanum_drive_controller/MecanumDriveController
+
+joint_state_broadcaster:
+  ros__parameters:
+    use_sim_time: True  # remove on real robots
+    update_rate: 100  # Hz
+
+mecanum_bot_base_controller:
+  ros__parameters:
+    use_sim_time: True  # remove on real robots
+    update_rate: 100  # Hz
+
+    front_left_wheel_command_joint_name: "front_left_wheel_joint"
+    front_right_wheel_command_joint_name: "front_right_wheel_joint"
+    rear_right_wheel_command_joint_name: "rear_right_wheel_joint"
+    rear_left_wheel_command_joint_name: "rear_left_wheel_joint"
+
+    kinematics:
+      base_frame_offset: { x: 0.0, y: 0.0, theta: 0.0 }
+      # based on urdf 
+      wheels_radius: 0.18
+      # <wheel_separation>0.834</wheel_separation>
+      # <wheelbase>1.788</wheelbase>
+      # <wheel_radius>0.18</wheel_radius>
+      # based on sdf , L=1.788/2=0.894 meters, W=0.834/2=0.417 meters
+      # The sum of robot center projection would be: L+W=0.894+0.417=1.311 meters
+      sum_of_robot_center_projection_on_X_Y_axis: 1.311
+
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    enable_odom_tf: true
+    #  Adjust these values based on the hardware's capabilities
+    pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    
+

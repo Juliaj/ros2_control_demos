@@ -16,12 +16,11 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     example_17_share_dir = get_package_share_directory('ros2_control_demo_example_17')
-    ros_gz_sim_share_dir = get_package_share_directory('ros_gz_sim')
 
     world_path = os.path.join(example_17_share_dir, 'worlds', 'rubicon.sdf')
     world_path += " -v 4 -r"
-    diffbot_path = os.path.join(example_17_share_dir, 'models', 'costar_husky', 'model.sdf')
-
+ 
+    mecanum_bot_path = os.path.join(example_17_share_dir, 'models', 'mecanum_lift', 'model.sdf')
     use_sim_time = LaunchConfiguration('use_sim_time', default=True)
 
     def robot_state_publisher(context):
@@ -29,7 +28,7 @@ def generate_launch_description():
             [
                 PathJoinSubstitution([FindExecutable(name='xacro')]),
                 ' ',
-                diffbot_path,
+                mecanum_bot_path,
             ]
         )
         robot_description = {'robot_description': robot_description_content}
@@ -45,22 +44,8 @@ def generate_launch_description():
         [
             FindPackageShare('ros2_control_demo_example_17'),
             'config',
-            'diffbot_chained_controllers.yaml',
+            'mecanum_bot_controller.yaml',
         ]
-    )
-
-    example_17_share_dir = get_package_share_directory('ros2_control_demo_example_17')    
-
-    gz_args = os.path.join(example_17_share_dir, 'worlds', 'rubicon.sdf')
-    gz_args += " -v 4 -r"
-
-    # Launch gazebo with rubicon world
-    gz_sim_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [PathJoinSubstitution([FindPackageShare('ros_gz_sim'),
-                                'launch',
-                                'gz_sim.launch.py'])]),
-        launch_arguments={'gz_args': gz_args}.items(),
     )
 
     x, y, z = -10.0, 0.0, 5.96
@@ -71,7 +56,7 @@ def generate_launch_description():
         output='screen',
         arguments=[
             '-topic', 'robot_description', 
-            '-name','diffbot', 
+            '-name','mecanum_bot', 
             '-allow_renaming', 'true',
             '-x', str(x), '-y', str(y), '-z', str(z),
             '-roll', str(qx), '-pitch', str(qy), '-yaw', str(qz),
@@ -86,25 +71,15 @@ def generate_launch_description():
         arguments=['joint_state_broadcaster'],
     )
 
-    pid_controllers_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "wheel_pids",
-            "--param-file",
-            robot_controllers,
-        ],
-    )
-
     robot_base_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
-            'diffbot_base_controller',
+            'mecanum_bot_base_controller',
             '--param-file',
             robot_controllers,
             "--controller-ros-args",
-            "-r /diffbot_base_controller/cmd_vel:=/cmd_vel",
+            "-r /mecanum_bot_base_controller/reference:=/cmd_vel",
             ],
     )
 
@@ -116,27 +91,20 @@ def generate_launch_description():
         output='screen'
     )
 
-    delay_robot_base_after_pid_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=pid_controllers_spawner,
-            on_exit=[robot_base_controller_spawner],
-        )
-    )
+    example_17_share_dir = get_package_share_directory('ros2_control_demo_example_17')    
 
-    # Delay start of joint_state_broadcaster after `robot_base_controller`
-    # TODO(anyone): This is a workaround for flaky tests. Remove when fixed.
-    delay_joint_state_broadcaster_after_robot_base_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=robot_base_controller_spawner,
-            on_exit=[joint_state_broadcaster_spawner],
-        )
-    )
-
-
-
+    gz_args = os.path.join(example_17_share_dir, 'worlds', 'rubicon.sdf')
+    gz_args += " -v 4 -r"
 
     ld = LaunchDescription([
-        gz_sim_launch,
+        # Launch gazebo with rubicon world
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                [PathJoinSubstitution([FindPackageShare('ros_gz_sim'),
+                                    'launch',
+                                    'gz_sim.launch.py'])]),
+            launch_arguments={'gz_args': gz_args}.items(),
+        ),
 
         # Add delay to allow Gazebo to fully load
         TimerAction(
@@ -144,11 +112,20 @@ def generate_launch_description():
             actions=[]
         ),
         
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=gz_spawn_entity,
+                on_exit=[joint_state_broadcaster_spawner],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[robot_base_controller_spawner],
+            )
+        ),
         bridge,
         gz_spawn_entity,
-        pid_controllers_spawner,
-        delay_robot_base_after_pid_controller_spawner,
-        delay_joint_state_broadcaster_after_robot_base_controller_spawner,
 
         DeclareLaunchArgument(
             'use_sim_time',

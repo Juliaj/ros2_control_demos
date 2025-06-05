@@ -705,49 +705,40 @@
     </joint>
     <static>0</static>
 
-    <!-- Differential drive plugin for rear wheels -->
-    <plugin
-    filename="libignition-gazebo-diff-drive-system.so"
-    name="ignition::gazebo::systems::DiffDrive">
-    <left_joint>rear_left_wheel_joint</left_joint>
-    <left_joint>front_left_wheel_joint</left_joint>
-    <right_joint>front_right_wheel_joint</right_joint>
-    <right_joint>rear_right_wheel_joint</right_joint>
-    <!-- Actual value of husky 0.5708, we use a different value for better steering -->
-    <wheel_separation>0.5708</wheel_separation>
-    <wheel_radius>0.1651</wheel_radius>
-    <odom_publish_frequency>100</odom_publish_frequency>
-    <topic>cmd_vel</topic>
+    <!-- ros_control plugin -->
+     <ros2_control name="GazeboSimSystem" type="system">
+      <hardware>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </hardware>
+      <joint name="rear_left_wheel_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="rear_right_wheel_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <!-- <joint name="front_left_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="front_right_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint> -->
+    </ros2_control>
+
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>/home/juliajia/ros2_control_ws/install/ros2_control_demo_example_17/share/ros2_control_demo_example_17/config/diffbot_chained_controllers.yaml</parameters>
     </plugin>
 
-    <!-- ground truth odometry plugin -->
-    <plugin
-    filename="libignition-gazebo-odometry-publisher-system.so"
-    name="ignition::gazebo::systems::OdometryPublisher">
-    <dimensions>3</dimensions>
-    <odom_publish_frequency>100.0</odom_publish_frequency>
-    <odom_topic>odom_ground_truth</odom_topic>
-    <odom_frame>map</odom_frame>
-    <robot_base_frame>base_link</robot_base_frame>
-    </plugin>
-
-    <plugin
-    filename="libignition-gazebo-key-publisher-system.so"
-    name="ignition::gazebo::systems::KeyPublisher">
-    <key_topic>keyboard/keypress</key_topic>
-    </plugin>
-
-    <!-- Teleop plugin for keyboard control -->
-    <plugin
-    filename="libignition-gazebo-teleop-system.so"
-    name="ignition::gazebo::systems::Teleop">
-    <topic>cmd_vel</topic>
-    <key_topic>keyboard/keypress</key_topic>
-    <linear_velocity>0.5</linear_velocity>
-    <angular_velocity>0.5</angular_velocity>
-    </plugin>
-
-    
-    
   </model>
 </sdf>
