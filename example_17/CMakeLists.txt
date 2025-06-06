@@ -4,13 +4,11 @@ project(ros2_control_demo_example_17)
 find_package(ament_cmake REQUIRED)
 find_package(gazebo QUIET)
 
-ament_python_install_package("ros2_control_demo_example_17")
-
 # INSTALL
-install(DIRECTORY 
-  description/gazebo 
-  description/launch 
-  description/ros2_control 
+install(DIRECTORY
+  description/gazebo
+  description/launch
+  description/ros2_control
   description/urdf
   bringup/launch
   bringup/config
@@ -28,6 +26,6 @@ if(BUILD_TESTING)
 endif()
 
 # setup the environmental hooks for the Gazebo resource path
-ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/env_hooks/gz_sim_resource_path.dsv.in")
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/gz_sim_resource_path.dsv.in")
 
 ament_package()

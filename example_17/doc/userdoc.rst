@@ -26,6 +26,9 @@ Tutorial steps
 
     ros2 launch ros2_control_demo_example_17 diffbot.launch.py
 
+    ros2 launch ros2_control_demo_example_17 diffbot_rubicon.launch.py sim_plugin:=gz_sim
+
+
   The launch file loads and starts the robot hardware, controllers and opens *RViz* and *Gazebo GUI*.
   In the starting terminal you will see output from the hardware implementation and simulator.
 

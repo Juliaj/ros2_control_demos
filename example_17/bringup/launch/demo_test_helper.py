@@ -40,24 +40,56 @@ class DiffbotChainedControllersTest(Node):
 
     def publish_cmd_vel(self, delay=0.1):
 
-        twist_msg = TwistStamped()
-        twist_msg.twist.linear.x = 0.7
-        twist_msg.twist.linear.y = 0.0
-        twist_msg.twist.linear.z = 0.0
-        twist_msg.twist.angular.x = 0.0
-        twist_msg.twist.angular.y = 0.0
-        twist_msg.twist.angular.z = 1.0
+        twist_msg_straight = TwistStamped()
+        twist_msg_straight.twist.linear.x = 0.5
+        twist_msg_straight.twist.linear.y = 0.0
+        twist_msg_straight.twist.linear.z = 0.0
+        twist_msg_straight.twist.angular.x = 0.0
+        twist_msg_straight.twist.angular.y = 0.0
+        twist_msg_straight.twist.angular.z = 0.0
 
+        twist_msg_turn = TwistStamped()
+        twist_msg_turn.twist.linear.x = 0.5
+        twist_msg_turn.twist.linear.y = 0.0
+        twist_msg_turn.twist.linear.z = 0.0
+        twist_msg_turn.twist.angular.x = 0.0
+        twist_msg_turn.twist.angular.y = 0.0
+        twist_msg_turn.twist.angular.z = 1.0
+
+        twist_msg_turn_backward = TwistStamped()
+        twist_msg_turn_backward.twist.linear.x = -0.5
+        twist_msg_turn_backward.twist.linear.y = 0.0
+        twist_msg_turn_backward.twist.linear.z = 0.0
+        twist_msg_turn_backward.twist.angular.x = 0.0
+        twist_msg_turn_backward.twist.angular.y = 0.0
+        twist_msg_turn_backward.twist.angular.z = 0.0
+
+        count = 0
         while rclpy.ok():
-            self.get_logger().info(f"Publishing twist message to cmd_vel: {twist_msg}")
-            self.publisher_.publish(twist_msg)
+            if count < 180:
+                self.get_logger().info(
+                    f"{count}, driving straight: {twist_msg_straight}"
+                )
+                self.publisher_.publish(twist_msg_straight)
+          
+            elif count < 200:
+                self.get_logger().info(f"{count}, turn: {twist_msg_turn}")
+                self.publisher_.publish(twist_msg_turn)
+
+            elif count < 300:
+                self.get_logger().info(f"{count}, go backward: {twist_msg_turn_backward}")
+                self.publisher_.publish(twist_msg_turn_backward)
+            # else:
+            #     self.get_logger().info(f"Publishing twist message to cmd_vel: {twist_msg_turn}")
+            #     self.publisher_.publish(twist_msg_turn)
+            count += 1
             time.sleep(delay)
 
 
 if __name__ == "__main__":
     rclpy.init()
     test_node = DiffbotChainedControllersTest()
-    test_node.set_feedforward_control()
+    # test_node.set_feedforward_control()
     test_node.publish_cmd_vel(delay=0.1)
     rclpy.spin(test_node)
     test_node.destroy_node()

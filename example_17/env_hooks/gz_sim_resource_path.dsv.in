@@ -1,3 +1,0 @@
-# Ament environment hook for GZ_SIM_RESOURCE_PATH
-prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share/@PROJECT_NAME@/worlds
-prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share/@PROJECT_NAME@/models/costar_husky

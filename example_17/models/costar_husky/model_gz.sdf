@@ -204,8 +204,7 @@
       <enable_wind>0</enable_wind>
       <kinematic>0</kinematic>
 
-    <!--
-      <sensor name="camera_front" type="rgbd_camera">
+      <!-- <sensor name="camera_front" type="rgbd_camera">
         <camera name="camera_front">
             <horizontal_fov>1.0472</horizontal_fov>
             <lens>
@@ -250,11 +249,11 @@
         <update_rate>20</update_rate>
         <visualize>0</visualize>
         <pose frame="">0.438 0 0.272 0 -0 0</pose>
-      </sensor>
+      </sensor> 
       <gravity>1</gravity>
-      <velocity_decay/>
+      <velocity_decay/> -->
 
-      <sensor name="front_cliff_laser" type="gpu_ray">
+      <!-- <sensor name="front_cliff_laser" type="gpu_ray">
           <pose>0.435 0 0.235 0 -2.4434589 0</pose>
           <update_rate>50</update_rate>
           <lidar>
@@ -279,7 +278,7 @@
           </lidar>
       </sensor>
       <gravity>1</gravity>
-      <velocity_decay/-->
+      <velocity_decay/> -->
 
       <sensor name="front_laser" type="gpu_lidar">
         <topic>laser_scan</topic>
@@ -706,27 +705,36 @@
     </joint>
     <static>0</static>
 
-    <!-- ros_control plugin -->
-     <ros2_control name="GazeboSimSystem" type="system">
-      <hardware>
-        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
-      </hardware>
-      <joint name="rear_left_wheel_joint">
-        <command_interface name="velocity"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-        <state_interface name="effort"/>
-      </joint>
-      <joint name="rear_right_wheel_joint">
-        <command_interface name="velocity"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-        <state_interface name="effort"/>
-      </joint>
-    </ros2_control>
-
-    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-       <parameters>$(find ros2_control_demo_example_17)/config/diffbot_controllers.yaml</parameters>
+    <!-- Differential drive plugin for rear wheels -->
+    <plugin
+      filename="gz-sim-diff-drive-system"
+      name="gz::sim::systems::DiffDrive">
+      <left_joint>rear_left_wheel_joint</left_joint>
+      <right_joint>rear_right_wheel_joint</right_joint>
+      <!-- Actual value of husky 0.5708, we use a different value for better steering -->
+      <wheel_separation>0.5708</wheel_separation>
+      <wheel_radius>0.1651</wheel_radius>
+      <odom_publish_frequency>100</odom_publish_frequency>
+      <topic>cmd_vel</topic>
     </plugin>
+
+    <!-- Ground truth odometry plugin -->
+    <plugin
+      filename="gz-sim-odometry-publisher-system"
+      name="gz::sim::systems::OdometryPublisher">
+      <dimensions>3</dimensions>
+      <odom_publish_frequency>100.0</odom_publish_frequency>
+      <odom_topic>odom_ground_truth</odom_topic>
+      <odom_frame>map</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+    </plugin>
+
+    <!-- For teleop plugin for keyboard control -->
+    <plugin
+      filename="gz-sim-key-publisher-system"
+      name="gz::sim::systems::KeyPublisher">
+      <key_topic>keyboard/keypress</key_topic>
+    </plugin>
+
   </model>
 </sdf>
