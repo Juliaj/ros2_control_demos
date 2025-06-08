@@ -249,7 +249,7 @@
         <update_rate>20</update_rate>
         <visualize>0</visualize>
         <pose frame="">0.438 0 0.272 0 -0 0</pose>
-      </sensor> 
+      </sensor>
       <gravity>1</gravity>
       <velocity_decay/> -->
 

@@ -6,10 +6,6 @@ find_package(gazebo QUIET)
 
 # INSTALL
 install(DIRECTORY
-  description/gazebo
-  description/launch
-  description/ros2_control
-  description/urdf
   bringup/launch
   bringup/config
   worlds

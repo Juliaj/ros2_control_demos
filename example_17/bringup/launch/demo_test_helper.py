@@ -67,11 +67,9 @@ class DiffbotChainedControllersTest(Node):
         count = 0
         while rclpy.ok():
             if count < 180:
-                self.get_logger().info(
-                    f"{count}, driving straight: {twist_msg_straight}"
-                )
+                self.get_logger().info(f"{count}, driving straight: {twist_msg_straight}")
                 self.publisher_.publish(twist_msg_straight)
-          
+
             elif count < 200:
                 self.get_logger().info(f"{count}, turn: {twist_msg_turn}")
                 self.publisher_.publish(twist_msg_turn)
