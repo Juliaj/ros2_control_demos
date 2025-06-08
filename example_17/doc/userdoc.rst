@@ -20,8 +20,7 @@ Tutorial steps
     ros2 launch ros2_control_demo_example_17 diffbot_rubicon.launch.py
 
 
-  The launch file loads and starts the robot hardware, and opens *Gazebo GUI*. You may need to zoom out to see the robot in *Gazebo GUI*. 
-  
+  The launch file loads and starts the robot hardware, and opens *Gazebo GUI*. You may need to zoom out to see the robot in *Gazebo GUI*.
 
 2. To drive around the robot, open another terminal and execute
 
@@ -29,8 +28,7 @@ Tutorial steps
 
     ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=true
 
-  Follow the instructions to move the robot using keyboard. Rubicon world is a difficult terrain so you may need to drive slowly and press `k` time to time to stop the robot. 
-
+  Follow the instructions to move the robot using keyboard. Rubicon world is a difficult terrain so you may need to drive slowly and press ``k`` key time to time to stop the robot.
 
 3. To start *DiffBot* example with Gazebo ``gz::sim::systems::DiffDrive`` plugin, stop the commands from previous steps. Then run following command
 
@@ -39,18 +37,17 @@ Tutorial steps
     ros2 launch ros2_control_demo_example_17 diffbot_rubicon.launch.py sim_plugin:=gz_sim
 
 
-  The launch file loads and starts the robot hardware, and opens *Gazebo GUI*. You may need to zoom out to see the robot in *Gazebo GUI*. 
-  
-4. To drive around the robot, from Gazebo GUI, search and add ``Teleop`` plugin. Under ``Teleop`` plugin, click on ``KEYBOARD``, then follow the instructions to move the robot. 
+  The launch file loads and starts the robot hardware, and opens *Gazebo GUI*. You may need to zoom out to see the robot in *Gazebo GUI*.
 
+4. To drive around the robot, from Gazebo GUI, search and add ``Teleop`` plugin. Under ``Teleop`` plugin, click on ``KEYBOARD``, then follow the instructions to move the robot.
 
 Files used for this demo
 --------------------------
 
 * Launch file: `diffbot_rubicon.launch.py <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/bringup/launch/diffbot_rubicon.launch.py>`__
 * Controllers yaml: `diffbot_controllers.yaml <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/bringup/config/diffbot_controllers.yaml>`__
-* Robot description: `model.sdf <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/description/models/costar_husky/model.sdf>`__ with `gz_ros2_control` plugin
-* Robot description: `model_gz.sdf <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/description/models/costar_husky/model_gz.sdf>`__ with Gazebo `diff_drive_controller` plugin
+* Robot description: `model.sdf <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/description/models/costar_husky/model.sdf>`__ with ``gz_ros2_control::GazeboSimROS2ControlPlugin`` plugin
+* Robot description: `model_gz.sdf <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/description/models/costar_husky/model_gz.sdf>`__ with Gazebo ``gz::sim::systems::DiffDrive`` plugin
 * Gazebo Simulation World: `rubicon.sdf <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_17/worlds/rubicon.sdf>`__
 
 Controllers from this demo
