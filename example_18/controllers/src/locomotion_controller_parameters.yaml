@@ -1,0 +1,27 @@
+locomotion_controller:
+  joints: {
+    type: string_array,
+    description: "Names of the joints to control",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+  model_path: {
+    type: string,
+    description: "Path to the ML model file (e.g., ONNX model)",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+  interfaces_broadcaster_topic: {
+    type: string,
+    default_value: "interfaces_state_broadcaster/values",
+    description: "Topic name from interfaces_state_broadcaster"
+  }
+  velocity_command_topic: {
+    type: string,
+    default_value: "~/cmd_vel",
+    description: "Topic name for velocity commands (geometry_msgs/Twist)"
+  }

@@ -1,0 +1,8 @@
+# Ament environment hook for Gazebo resource discovery
+# References:
+#   - https://github.com/Yadunund/sdformat_urdf/blob/5c7c8e825789d654322b04a66e499c186918d7b8/sdformat_urdf/README.md
+#   - https://github.com/husky/husky
+
+prepend-non-duplicate;IGN_GAZEBO_RESOURCE_PATH;share/ros2_control_demo_example_18
+prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share/ros2_control_demo_example_18
+prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share

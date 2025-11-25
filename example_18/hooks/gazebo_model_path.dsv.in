@@ -1,0 +1,2 @@
+#ament_prepend_unique_value GAZEBO_MODEL_PATH "$AMENT_CURRENT_PREFIX/share/ros2_control_demo_example_18"
+#ament_prepend_unique_value GAZEBO_RESOURCE_PATH "$AMENT_CURRENT_PREFIX/share/ros2_control_demo_example_18"

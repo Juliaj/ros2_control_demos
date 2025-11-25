@@ -1,0 +1,83 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 250
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    imu_sensor_broadcaster_1:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+    imu_sensor_broadcaster_2:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+    interfaces_state_broadcaster:
+      type: interfaces_state_broadcaster/InterfacesStateBroadcaster
+    locomotion_controller:
+      type: locomotion_controller/LocomotionController
+
+joint_state_broadcaster:
+  ros__parameters: {}
+
+imu_sensor_broadcaster_1:
+  ros__parameters:
+    sensor_name: "imu_1"
+    frame_id: "base_link"
+    rotation_offset:
+      roll: 0.0
+      pitch: 0.0
+      yaw: 0.0
+
+imu_sensor_broadcaster_2:
+  ros__parameters:
+    sensor_name: "imu_2"
+    frame_id: "base_link"
+    rotation_offset:
+      roll: 0.0
+      pitch: 0.0
+      yaw: 0.0
+
+interfaces_state_broadcaster:
+  ros__parameters:
+    interfaces:
+      - leg_left_hip_roll_joint/position
+      - leg_left_hip_roll_joint/velocity
+      - leg_left_hip_yaw_joint/position
+      - leg_left_hip_yaw_joint/velocity
+      - leg_left_hip_pitch_joint/position
+      - leg_left_hip_pitch_joint/velocity
+      - leg_left_knee_pitch_joint/position
+      - leg_left_knee_pitch_joint/velocity
+      - leg_left_ankle_pitch_joint/position
+      - leg_left_ankle_pitch_joint/velocity
+      - leg_left_ankle_roll_joint/position
+      - leg_left_ankle_roll_joint/velocity
+      - leg_right_hip_roll_joint/position
+      - leg_right_hip_roll_joint/velocity
+      - leg_right_hip_yaw_joint/position
+      - leg_right_hip_yaw_joint/velocity
+      - leg_right_hip_pitch_joint/position
+      - leg_right_hip_pitch_joint/velocity
+      - leg_right_knee_pitch_joint/position
+      - leg_right_knee_pitch_joint/velocity
+      - leg_right_ankle_pitch_joint/position
+      - leg_right_ankle_pitch_joint/velocity
+      - leg_right_ankle_roll_joint/position
+      - leg_right_ankle_roll_joint/velocity
+
+locomotion_controller:
+  ros__parameters:
+    update_rate: 25
+    joints:
+      - leg_left_hip_roll_joint
+      - leg_left_hip_yaw_joint
+      - leg_left_hip_pitch_joint
+      - leg_left_knee_pitch_joint
+      - leg_left_ankle_pitch_joint
+      - leg_left_ankle_roll_joint
+      - leg_right_hip_roll_joint
+      - leg_right_hip_yaw_joint
+      - leg_right_hip_pitch_joint
+      - leg_right_knee_pitch_joint
+      - leg_right_ankle_pitch_joint
+      - leg_right_ankle_roll_joint
+    model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/policy_biped_25hz_a.onnx"
+    interfaces_broadcaster_topic: "interfaces_state_broadcaster/values"
+    velocity_command_topic: "~/cmd_vel"

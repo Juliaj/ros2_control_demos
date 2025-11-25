@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- Berkeley Humanoid Lite Biped Robot -->
+<!--
+This xacro file extends the base URDF with ros2_control and Gazebo configurations.
+It includes the base robot description from berkeley_humanoid_lite_biped.urdf
+and adds ros2_control and Gazebo plugin configurations.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="berkeley-humanoid-lite">
+  <xacro:arg name="prefix" default="" />
+  <xacro:arg name="use_gazebo" default="true" />
+
+  <!-- Include the base URDF description -->
+  <!-- Note: xacro will process the URDF file and merge its content -->
+  <xacro:include filename="$(find ros2_control_demo_example_18)/description/urdf/berkeley_humanoid_lite_biped.urdf" />
+
+  <!-- Import Berkeley Humanoid Lite Biped ros2_control description -->
+  <xacro:include filename="$(find ros2_control_demo_example_18)/description/ros2_control/berkeley_humanoid_lite_biped.ros2_control.xacro" />
+
+  <xacro:berkeley_humanoid_lite_biped_ros2_control
+    name="BerkeleyHumanoidLiteBiped" prefix="$(arg prefix)" use_gazebo="$(arg use_gazebo)"/>
+
+  <xacro:if value="$(arg use_gazebo)">
+    <!-- Import Gazebo definitions + plugin -->
+    <xacro:include filename="$(find ros2_control_demo_example_18)/description/gazebo/berkeley_humanoid_lite_biped.gazebo.xacro" />
+    <xacro:berkeley_humanoid_lite_biped_gazebo prefix="$(arg prefix)"/>
+  </xacro:if>
+</robot>

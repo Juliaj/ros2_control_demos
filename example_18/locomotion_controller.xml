@@ -1,0 +1,10 @@
+<library path="locomotion_controller">
+  <class name="locomotion_controller/LocomotionController"
+         type="locomotion_controller::LocomotionController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      Controller for bipedal locomotion using ML policy (e.g., ONNX model).
+      Subscribes to sensor data and velocity commands, runs inference, and writes joint positions.
+    </description>
+  </class>
+</library>
