@@ -170,10 +170,17 @@ if(BUILD_TESTING)
   target_link_libraries(test_action_processor
     action_processor
   )
+
+  # Unit tests for ONNX shape handling
+  ament_add_gtest(test_onnx_shape_handling
+    controllers/test/test_onnx_shape_handling.cpp
+  )
+
   add_custom_target(build_example_18_tests ALL
     DEPENDS
       test_observation_formatter
       test_action_processor
+      test_onnx_shape_handling
   )
 endif()
 

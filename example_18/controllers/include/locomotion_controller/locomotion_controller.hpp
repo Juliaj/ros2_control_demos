@@ -66,6 +66,18 @@ private:
   // Run model inference
   std::vector<double> run_model_inference(const std::vector<float> & inputs);
 
+  // Initialize joint position limits from ros2_control config
+  void initialize_joint_limits();
+
+#ifdef ONNXRUNTIME_FOUND
+  // Utility functions for ONNX model debugging
+  static std::string format_shape_string(const std::vector<int64_t> & shape);
+  static const char * get_onnx_type_name(ONNXTensorElementDataType type);
+  void log_input_metadata(Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator);
+  void log_output_metadata(Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator);
+  void validate_model_structure(size_t num_inputs, size_t num_outputs);
+#endif
+
   // Parameters
   std::vector<std::string> joint_names_;
   std::string model_path_;
@@ -112,6 +124,10 @@ private:
   // Default joint positions (used for action offset, initialized from current positions)
   std::vector<double> default_joint_positions_;
   bool default_joint_positions_initialized_;
+
+  // Joint position limits (min/max) for clamping commands
+  std::vector<double> joint_position_limits_min_;
+  std::vector<double> joint_position_limits_max_;
 };
 
 }  // namespace locomotion_controller

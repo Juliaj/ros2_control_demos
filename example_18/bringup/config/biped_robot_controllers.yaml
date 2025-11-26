@@ -89,3 +89,7 @@ locomotion_controller:
     model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/policy_biped_25hz_a.onnx"
     interfaces_broadcaster_topic: "interfaces_state_broadcaster/values"
     velocity_command_topic: "~/cmd_vel"
+    # Joint position limits (min/max) - more conservative than URDF to avoid Gazebo errors
+    # If not specified, defaults from ros2_control config will be used
+    joint_position_limits_min: [-0.2, -0.98, -1.9, -0.0, -0.78, -0.26, -0.2, -0.98, -1.9, -0.0, -0.78, -0.26]
+    joint_position_limits_max: [0.2, 0.59, 0.98, 2.44, 0.78, 0.26, 0.2, 0.59, 0.98, 2.44, 0.78, 0.26]

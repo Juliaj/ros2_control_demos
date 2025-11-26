@@ -152,6 +152,35 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Controller spawners
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
+    imu_sensor_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["imu_sensor_broadcaster_2", "--controller-manager", "/controller_manager"],
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
+    interfaces_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["interfaces_state_broadcaster", "--controller-manager", "/controller_manager"],
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
+    locomotion_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["locomotion_controller", "--controller-manager", "/controller_manager"],
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
     nodes = [
         set_ign_resource_path,
         set_gz_resource_path,
@@ -159,6 +188,10 @@ def generate_launch_description():
         robot_state_publisher_node,
         spawn_entity_node,
         bridge_clock_node,
+        joint_state_broadcaster_spawner,
+        imu_sensor_broadcaster_spawner,
+        interfaces_state_broadcaster_spawner,
+        locomotion_controller_spawner,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

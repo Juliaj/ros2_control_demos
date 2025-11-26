@@ -52,15 +52,33 @@ std::vector<float> ObservationFormatter::format(
 
   // 1. Velocity commands (4D: lin_vel_x, lin_vel_y, ang_vel_z, heading)
   std::vector<float> velocity_commands = format_velocity_commands(velocity_cmd);
+  if (velocity_commands.size() != 4)
+  {
+    throw std::runtime_error(
+      "Velocity commands size mismatch: expected 4, got " +
+      std::to_string(velocity_commands.size()));
+  }
   observation.insert(observation.end(), velocity_commands.begin(), velocity_commands.end());
 
   // 2. Base angular velocity (3D vector)
+  if (base_angular_velocity.size() != 3)
+  {
+    throw std::runtime_error(
+      "Base angular velocity size mismatch: expected 3, got " +
+      std::to_string(base_angular_velocity.size()));
+  }
   for (const auto & val : base_angular_velocity)
   {
     observation.push_back(static_cast<float>(val));
   }
 
   // 3. Projected gravity vector (3D vector)
+  if (projected_gravity.size() != 3)
+  {
+    throw std::runtime_error(
+      "Projected gravity size mismatch: expected 3, got " +
+      std::to_string(projected_gravity.size()));
+  }
   for (const auto & val : projected_gravity)
   {
     observation.push_back(static_cast<float>(val));
@@ -91,9 +109,29 @@ std::vector<float> ObservationFormatter::format(
   }
 
   // 6. Previous action (N joints)
+  if (previous_action.size() != num_joints_)
+  {
+    throw std::runtime_error(
+      "Previous action size mismatch: expected " + std::to_string(num_joints_) + ", got " +
+      std::to_string(previous_action.size()));
+  }
   for (const auto & val : previous_action)
   {
     observation.push_back(static_cast<float>(val));
+  }
+
+  // Validate final observation size
+  if (observation.size() != observation_dim_)
+  {
+    throw std::runtime_error(
+      "Observation size mismatch: expected " + std::to_string(observation_dim_) + ", got " +
+      std::to_string(observation.size()) +
+      ". Components: velocity_commands=" + std::to_string(velocity_commands.size()) +
+      ", base_ang_vel=" + std::to_string(base_angular_velocity.size()) +
+      ", projected_gravity=" + std::to_string(projected_gravity.size()) +
+      ", joint_pos=" + std::to_string(joint_positions.size()) +
+      ", joint_vel=" + std::to_string(joint_velocities.size()) +
+      ", previous_action=" + std::to_string(previous_action.size()));
   }
 
   return observation;
