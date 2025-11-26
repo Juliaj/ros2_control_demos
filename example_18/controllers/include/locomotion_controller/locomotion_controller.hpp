@@ -76,10 +76,12 @@ private:
   // Model runtime (ONNX Runtime)
 #ifdef ONNXRUNTIME_FOUND
   std::unique_ptr<Ort::Session> onnx_session_;
-  Ort::Env onnx_env_;
-  Ort::MemoryInfo onnx_memory_info_;
-  std::vector<const char *> input_names_;
-  std::vector<const char *> output_names_;
+  std::unique_ptr<Ort::Env> onnx_env_;
+  std::unique_ptr<Ort::MemoryInfo> onnx_memory_info_;
+  std::vector<std::string> input_names_;
+  std::vector<std::string> output_names_;
+  std::vector<const char *> input_name_ptrs_;
+  std::vector<const char *> output_name_ptrs_;
   std::vector<int64_t> input_shape_;
   std::vector<int64_t> output_shape_;
 #endif

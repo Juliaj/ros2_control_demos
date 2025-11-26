@@ -10,6 +10,17 @@
       </plugin>
     </gazebo>
 
+   <!-- imu sensor plugin -->
+   <gazebo reference="${prefix}imu_2">
+    <sensor name="${prefix}imu_2" type="imu">
+      <update_rate>400</update_rate>
+      <plugin name="gz::sim::systems::Imu" filename="libgz-sim-imu-system.so">
+        <gaussian_noise>0.0</gaussian_noise>
+        <topic>${prefix}imu_2/imu</topic>
+      </plugin>
+    </sensor>
+  </gazebo>
+
   </xacro:macro>
 
 </robot>

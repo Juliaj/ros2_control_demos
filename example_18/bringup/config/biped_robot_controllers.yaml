@@ -4,8 +4,6 @@ controller_manager:
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-    imu_sensor_broadcaster_1:
-      type: imu_sensor_broadcaster/IMUSensorBroadcaster
     imu_sensor_broadcaster_2:
       type: imu_sensor_broadcaster/IMUSensorBroadcaster
     interfaces_state_broadcaster:
@@ -61,6 +59,16 @@ interfaces_state_broadcaster:
       - leg_right_ankle_pitch_joint/velocity
       - leg_right_ankle_roll_joint/position
       - leg_right_ankle_roll_joint/velocity
+      - imu_2/orientation.x
+      - imu_2/orientation.y
+      - imu_2/orientation.z
+      - imu_2/orientation.w
+      - imu_2/angular_velocity.x
+      - imu_2/angular_velocity.y
+      - imu_2/angular_velocity.z
+      - imu_2/linear_acceleration.x
+      - imu_2/linear_acceleration.y
+      - imu_2/linear_acceleration.z
 
 locomotion_controller:
   ros__parameters:

@@ -7,6 +7,7 @@ export_windows_symbols()
 
 # find dependencies
 set(THIS_PACKAGE_INCLUDE_DEPENDS
+  ament_index_cpp
   pluginlib
   rclcpp
   rclcpp_lifecycle
@@ -29,11 +30,22 @@ find_package(control_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 # Optional ONNX Runtime
-find_package(onnxruntime QUIET)
-if(onnxruntime_FOUND)
+find_library(ONNXRUNTIME_LIB onnxruntime
+  PATHS /usr/local/lib /usr/lib
+  NO_DEFAULT_PATH
+)
+find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
+  PATHS /usr/local/include /usr/include
+  NO_DEFAULT_PATH
+)
+
+if(ONNXRUNTIME_LIB AND ONNXRUNTIME_INCLUDE_DIR)
+  set(onnxruntime_FOUND TRUE)
   add_definitions(-DONNXRUNTIME_FOUND)
-  message(STATUS "ONNX Runtime found: ${onnxruntime_VERSION}")
+  message(STATUS "ONNX Runtime found: ${ONNXRUNTIME_LIB}")
+  message(STATUS "ONNX Runtime include: ${ONNXRUNTIME_INCLUDE_DIR}")
 else()
+  set(onnxruntime_FOUND FALSE)
   message(WARNING "ONNX Runtime not found. Install onnxruntime-dev for full functionality.")
 endif()
 
@@ -83,6 +95,10 @@ target_link_libraries(locomotion_controller
   observation_formatter
   action_processor
 )
+if(onnxruntime_FOUND)
+  target_include_directories(locomotion_controller PRIVATE ${ONNXRUNTIME_INCLUDE_DIR})
+  target_link_libraries(locomotion_controller ${ONNXRUNTIME_LIB})
+endif()
 ament_target_dependencies(locomotion_controller
   controller_interface
   pluginlib
@@ -106,6 +122,10 @@ install(
 install(
   DIRECTORY description/
   DESTINATION share/ros2_control_demo_example_18/description
+)
+install(
+  DIRECTORY onnx_model/
+  DESTINATION share/ros2_control_demo_example_18/onnx_model
 )
 install(TARGETS
     observation_formatter

@@ -16,7 +16,6 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
-from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
@@ -58,11 +57,6 @@ def generate_launch_description():
             description="Arguments passed to gz_sim.launch.py (world, verbosity, etc.).",
         ),
         DeclareLaunchArgument(
-            "bridge_clock",
-            default_value="false",
-            description="If true, bridges /clock from Gazebo via ros_gz_bridge.",
-        ),
-        DeclareLaunchArgument(
             "use_sim_time",
             default_value="true",
             description="Pass use_sim_time to ROS 2 nodes launched here.",
@@ -74,7 +68,6 @@ def generate_launch_description():
     prefix = LaunchConfiguration("prefix")
     robot_name = LaunchConfiguration("robot_name")
     gz_args = LaunchConfiguration("gz_args")
-    bridge_clock = LaunchConfiguration("bridge_clock")
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     description_share = FindPackageShare(description_package)
@@ -155,9 +148,8 @@ def generate_launch_description():
     bridge_clock_node = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock]"],
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
         output="screen",
-        condition=IfCondition(bridge_clock),
     )
 
     nodes = [

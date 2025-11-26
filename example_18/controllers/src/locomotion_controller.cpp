@@ -16,7 +16,9 @@
 
 #include <algorithm>
 #include <limits>
+#include <regex>
 
+#include "ament_index_cpp/get_package_share_directory.hpp"
 #include "controller_interface/helpers.hpp"
 #include "pluginlib/class_list_macros.hpp"
 
@@ -69,7 +71,21 @@ controller_interface::CallbackReturn LocomotionController::on_configure(
 {
   // Read parameters
   joint_names_ = get_node()->get_parameter("joints").as_string_array();
-  model_path_ = get_node()->get_parameter("model_path").as_string();
+
+  // Get model path and expand $(find-pkg-share ...) substitution
+  std::string raw_model_path = get_node()->get_parameter("model_path").as_string();
+  std::regex pkg_share_regex(R"(\$\(find-pkg-share\s+([^\)]+)\))");
+  std::smatch match;
+  if (std::regex_search(raw_model_path, match, pkg_share_regex))
+  {
+    std::string package_name = match[1].str();
+    std::string package_share = ament_index_cpp::get_package_share_directory(package_name);
+    model_path_ = std::regex_replace(raw_model_path, pkg_share_regex, package_share);
+  }
+  else
+  {
+    model_path_ = raw_model_path;
+  }
   interfaces_broadcaster_topic_ =
     get_node()->get_parameter("interfaces_broadcaster_topic").as_string();
   interfaces_broadcaster_names_topic_ =
@@ -228,8 +244,9 @@ bool LocomotionController::load_model(const std::string & model_path)
   try
   {
     // Initialize ONNX Runtime environment
-    onnx_env_ = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "LocomotionController");
-    onnx_memory_info_ = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    onnx_env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "LocomotionController");
+    onnx_memory_info_ = std::make_unique<Ort::MemoryInfo>(
+      Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
 
     // Create session options
     Ort::SessionOptions session_options;
@@ -237,7 +254,7 @@ bool LocomotionController::load_model(const std::string & model_path)
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_BASIC);
 
     // Create session from model file
-    onnx_session_ = std::make_unique<Ort::Session>(onnx_env_, model_path.c_str(), session_options);
+    onnx_session_ = std::make_unique<Ort::Session>(*onnx_env_, model_path.c_str(), session_options);
 
     // Get input/output names and shapes
     Ort::AllocatorWithDefaultOptions allocator;
@@ -252,7 +269,7 @@ bool LocomotionController::load_model(const std::string & model_path)
     }
 
     auto input_name = onnx_session_->GetInputNameAllocated(0, allocator);
-    input_names_.push_back(input_name.get());
+    input_names_.push_back(std::string(input_name.get()));
     auto input_type_info = onnx_session_->GetInputTypeInfo(0);
     auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
     input_shape_ = input_tensor_info.GetShape();
@@ -267,10 +284,22 @@ bool LocomotionController::load_model(const std::string & model_path)
     }
 
     auto output_name = onnx_session_->GetOutputNameAllocated(0, allocator);
-    output_names_.push_back(output_name.get());
+    output_names_.push_back(std::string(output_name.get()));
     auto output_type_info = onnx_session_->GetOutputTypeInfo(0);
     auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
     output_shape_ = output_tensor_info.GetShape();
+
+    // Create pointer arrays from stored strings
+    input_name_ptrs_.clear();
+    for (const auto & name : input_names_)
+    {
+      input_name_ptrs_.push_back(name.c_str());
+    }
+    output_name_ptrs_.clear();
+    for (const auto & name : output_names_)
+    {
+      output_name_ptrs_.push_back(name.c_str());
+    }
 
     // Validate model structure
     size_t expected_input_size = observation_formatter_->get_observation_dim();
@@ -320,7 +349,9 @@ std::vector<double> LocomotionController::run_model_inference(const std::vector<
 #ifdef ONNXRUNTIME_FOUND
   if (!model_loaded_ || !onnx_session_)
   {
-    RCLCPP_ERROR(get_node()->get_logger(), "Model not loaded");
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 5000,
+      "Model not loaded");
     return std::vector<double>(joint_names_.size(), 0.0);
   }
 
@@ -331,12 +362,13 @@ std::vector<double> LocomotionController::run_model_inference(const std::vector<
     std::vector<int64_t> input_shape = {1, static_cast<int64_t>(input_size)};
 
     Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-      onnx_memory_info_, const_cast<float *>(inputs.data()), input_size, input_shape.data(),
+      *onnx_memory_info_, const_cast<float *>(inputs.data()), input_size, input_shape.data(),
       input_shape.size());
 
     // Run inference
     auto output_tensors = onnx_session_->Run(
-      Ort::RunOptions{nullptr}, input_names_.data(), &input_tensor, 1, output_names_.data(), 1);
+      Ort::RunOptions{nullptr}, input_name_ptrs_.data(), &input_tensor, 1, output_name_ptrs_.data(),
+      1);
 
     // Extract output tensor
     float * float_array = output_tensors.front().GetTensorMutableData<float>();
@@ -354,12 +386,16 @@ std::vector<double> LocomotionController::run_model_inference(const std::vector<
   }
   catch (const std::exception & e)
   {
-    RCLCPP_ERROR(get_node()->get_logger(), "Model inference failed: %s", e.what());
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 5000,
+      "Model inference failed: %s", e.what());
     return std::vector<double>(joint_names_.size(), 0.0);
   }
 #else
   (void)inputs;
-  RCLCPP_WARN(get_node()->get_logger(), "ONNX Runtime not available, returning zeros");
+  RCLCPP_WARN_THROTTLE(
+    get_node()->get_logger(), *get_node()->get_clock(), 5000,
+    "ONNX Runtime not available, returning zeros");
   return std::vector<double>(joint_names_.size(), 0.0);
 #endif
 }
