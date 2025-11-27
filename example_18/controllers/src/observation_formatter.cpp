@@ -208,71 +208,71 @@ void ObservationFormatter::extract_interface_data(
   // Get logger (respects RCUTILS_LOGGING_SEVERITY environment variable)
   auto logger = rclcpp::get_logger("observation_formatter");
 
-  // Extract IMU orientation quaternion components
+  // Expected interface order (aligned with observation vector):
+  // 0-3: IMU orientation (x, y, z, w)
+  // 4-6: IMU angular velocity (x, y, z)
+  // 7-9: IMU linear acceleration (x, y, z) - not used
+  // 10-21: Joint positions (num_joints_)
+  // 22-33: Joint velocities (num_joints_)
+  const size_t expected_size = 10 + 2 * num_joints_;  // 10 IMU + 2*num_joints_ (pos+vel)
+  const size_t count = std::min(interface_names_.size(), msg.values.size());
+
+  // Validate interface count matches expected size
+  if (count < expected_size)
+  {
+    static size_t warn_size_counter = 0;
+    if (++warn_size_counter % 125 == 0)  // Warn every 125 calls (~5 seconds at 25Hz)
+    {
+      RCLCPP_WARN(
+        logger,
+        "Interface count mismatch: expected at least %zu, got %zu. "
+        "Some data may be missing.",
+        expected_size, count);
+    }
+  }
+
+  // Extract IMU orientation quaternion components (indices 0-3)
   double imu_orientation_x = 0.0, imu_orientation_y = 0.0, imu_orientation_z = 0.0,
          imu_orientation_w = 1.0;
   bool imu_orientation_found = false;
-
-  // Iterate through interface values to extract data, matching names published by broadcaster
-  const size_t count = std::min(interface_names_.size(), msg.values.size());
-  bool imu_ang_vel_found[3] = {false, false, false};
-
-  for (size_t idx = 0; idx < count; ++idx)
+  if (count >= 4)
   {
-    const std::string & name = interface_names_[idx];
-    const double value = msg.values[idx];
+    imu_orientation_x = msg.values[0];
+    imu_orientation_y = msg.values[1];
+    imu_orientation_z = msg.values[2];
+    imu_orientation_w = msg.values[3];
+    imu_orientation_found = true;
+  }
 
-    // Extract base angular velocity from IMU
-    if (name == imu_sensor_name_ + "/angular_velocity.x")
+  // Extract base angular velocity from IMU (indices 4-6)
+  bool imu_ang_vel_found[3] = {false, false, false};
+  if (count >= 7)
+  {
+    base_angular_velocity[0] = msg.values[4];
+    base_angular_velocity[1] = msg.values[5];
+    base_angular_velocity[2] = msg.values[6];
+    imu_ang_vel_found[0] = true;
+    imu_ang_vel_found[1] = true;
+    imu_ang_vel_found[2] = true;
+  }
+
+  // Extract joint positions (indices 10 to 10+num_joints_-1)
+  const size_t joint_pos_start = 10;
+  const size_t joint_vel_start = 10 + num_joints_;
+  if (count >= joint_vel_start + num_joints_)
+  {
+    for (size_t i = 0; i < num_joints_; ++i)
     {
-      base_angular_velocity[0] = value;
-      imu_ang_vel_found[0] = true;
+      joint_positions[i] = msg.values[joint_pos_start + i];
+      joint_velocities[i] = msg.values[joint_vel_start + i];
     }
-    else if (name == imu_sensor_name_ + "/angular_velocity.y")
+  }
+  else if (count >= joint_pos_start + num_joints_)
+  {
+    // Only positions available
+    for (size_t i = 0; i < num_joints_; ++i)
     {
-      base_angular_velocity[1] = value;
-      imu_ang_vel_found[1] = true;
-    }
-    else if (name == imu_sensor_name_ + "/angular_velocity.z")
-    {
-      base_angular_velocity[2] = value;
-      imu_ang_vel_found[2] = true;
-    }
-    // Extract IMU orientation quaternion
-    else if (name == imu_sensor_name_ + "/orientation.x")
-    {
-      imu_orientation_x = value;
-      imu_orientation_found = true;
-    }
-    else if (name == imu_sensor_name_ + "/orientation.y")
-    {
-      imu_orientation_y = value;
-      imu_orientation_found = true;
-    }
-    else if (name == imu_sensor_name_ + "/orientation.z")
-    {
-      imu_orientation_z = value;
-      imu_orientation_found = true;
-    }
-    else if (name == imu_sensor_name_ + "/orientation.w")
-    {
-      imu_orientation_w = value;
-      imu_orientation_found = true;
-    }
-    // Extract joint positions and velocities
-    else
-    {
-      for (size_t i = 0; i < joint_names_.size(); ++i)
-      {
-        if (name == joint_names_[i] + "/position")
-        {
-          joint_positions[i] = value;
-        }
-        else if (name == joint_names_[i] + "/velocity")
-        {
-          joint_velocities[i] = value;
-        }
-      }
+      joint_positions[i] = msg.values[joint_pos_start + i];
     }
   }
 
