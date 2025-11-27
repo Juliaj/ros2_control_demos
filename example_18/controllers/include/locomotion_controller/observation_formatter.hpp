@@ -40,14 +40,14 @@ public:
   // 5. Joint velocities (N joints, relative)
   // 6. Previous action (N joints)
   std::vector<float> format(
-    const control_msgs::msg::InterfacesValues & sensor_data,
+    const control_msgs::msg::InterfacesValues & interface_data,
     const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action);
 
   size_t get_observation_dim() const { return observation_dim_; }
 
-  // Extract joint positions from sensor data (for initializing default positions)
+  // Extract joint positions from interface data (for initializing default positions)
   std::vector<double> extract_joint_positions(
-    const control_msgs::msg::InterfacesValues & sensor_data);
+    const control_msgs::msg::InterfacesValues & interface_data);
 
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
@@ -56,8 +56,8 @@ public:
   void set_interface_names(const std::vector<std::string> & interface_names);
 
 private:
-  // Extract sensor data from interfaces_values message
-  void extract_sensor_data(
+  // Extract interface data (IMU and joint states) from interfaces_values message
+  void extract_interface_data(
     const control_msgs::msg::InterfacesValues & msg, std::vector<double> & base_angular_velocity,
     std::vector<double> & projected_gravity, std::vector<double> & joint_positions,
     std::vector<double> & joint_velocities);

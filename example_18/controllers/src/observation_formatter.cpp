@@ -18,6 +18,8 @@
 #include <cmath>
 #include <string>
 
+#include "rclcpp/logging.hpp"
+
 namespace locomotion_controller
 {
 
@@ -35,17 +37,17 @@ ObservationFormatter::ObservationFormatter(
 }
 
 std::vector<float> ObservationFormatter::format(
-  const control_msgs::msg::InterfacesValues & sensor_data,
+  const control_msgs::msg::InterfacesValues & interface_data,
   const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action)
 {
-  // Extract sensor data from message
+  // Extract interface data from message
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
   std::vector<double> joint_positions;
   std::vector<double> joint_velocities;
 
-  extract_sensor_data(
-    sensor_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+  extract_interface_data(
+    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
 
   // Build observation vector in the correct order
   std::vector<float> observation;
@@ -145,15 +147,15 @@ std::vector<float> ObservationFormatter::format(
 }
 
 std::vector<double> ObservationFormatter::extract_joint_positions(
-  const control_msgs::msg::InterfacesValues & sensor_data)
+  const control_msgs::msg::InterfacesValues & interface_data)
 {
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
   std::vector<double> joint_positions;
   std::vector<double> joint_velocities;
 
-  extract_sensor_data(
-    sensor_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+  extract_interface_data(
+    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
 
   return joint_positions;
 }
@@ -187,7 +189,7 @@ std::vector<float> ObservationFormatter::format_velocity_commands(
   };
 }
 
-void ObservationFormatter::extract_sensor_data(
+void ObservationFormatter::extract_interface_data(
   const control_msgs::msg::InterfacesValues & msg, std::vector<double> & base_angular_velocity,
   std::vector<double> & projected_gravity, std::vector<double> & joint_positions,
   std::vector<double> & joint_velocities)
@@ -203,6 +205,9 @@ void ObservationFormatter::extract_sensor_data(
   joint_positions.resize(num_joints_, 0.0);
   joint_velocities.resize(num_joints_, 0.0);
 
+  // Get logger (respects RCUTILS_LOGGING_SEVERITY environment variable)
+  auto logger = rclcpp::get_logger("observation_formatter");
+
   // Extract IMU orientation quaternion components
   double imu_orientation_x = 0.0, imu_orientation_y = 0.0, imu_orientation_z = 0.0,
          imu_orientation_w = 1.0;
@@ -210,6 +215,8 @@ void ObservationFormatter::extract_sensor_data(
 
   // Iterate through interface values to extract data, matching names published by broadcaster
   const size_t count = std::min(interface_names_.size(), msg.values.size());
+  bool imu_ang_vel_found[3] = {false, false, false};
+
   for (size_t idx = 0; idx < count; ++idx)
   {
     const std::string & name = interface_names_[idx];
@@ -219,14 +226,17 @@ void ObservationFormatter::extract_sensor_data(
     if (name == imu_sensor_name_ + "/angular_velocity.x")
     {
       base_angular_velocity[0] = value;
+      imu_ang_vel_found[0] = true;
     }
     else if (name == imu_sensor_name_ + "/angular_velocity.y")
     {
       base_angular_velocity[1] = value;
+      imu_ang_vel_found[1] = true;
     }
     else if (name == imu_sensor_name_ + "/angular_velocity.z")
     {
       base_angular_velocity[2] = value;
+      imu_ang_vel_found[2] = true;
     }
     // Extract IMU orientation quaternion
     else if (name == imu_sensor_name_ + "/orientation.x")
@@ -263,6 +273,46 @@ void ObservationFormatter::extract_sensor_data(
           joint_velocities[i] = value;
         }
       }
+    }
+  }
+
+  // Debug: Log IMU data extraction status (throttled using static counter)
+  static size_t debug_counter = 0;
+  if (++debug_counter % 50 == 0)  // Log every 50 calls (~2 seconds at 25Hz)
+  {
+    RCLCPP_INFO(
+      logger,
+      "IMU data extraction: orientation_found=%s, ang_vel_found=[%s, %s, %s], "
+      "ang_vel=[%.4f, %.4f, %.4f], orientation=[%.4f, %.4f, %.4f, %.4f]",
+      imu_orientation_found ? "yes" : "no", imu_ang_vel_found[0] ? "yes" : "no",
+      imu_ang_vel_found[1] ? "yes" : "no", imu_ang_vel_found[2] ? "yes" : "no",
+      base_angular_velocity[0], base_angular_velocity[1], base_angular_velocity[2],
+      imu_orientation_x, imu_orientation_y, imu_orientation_z, imu_orientation_w);
+  }
+
+  if (!imu_orientation_found)
+  {
+    static size_t warn_counter = 0;
+    if (++warn_counter % 125 == 0)  // Warn every 125 calls (~5 seconds at 25Hz)
+    {
+      RCLCPP_WARN(
+        logger,
+        "IMU orientation not found! Looking for '%s/orientation.{x,y,z,w}'. "
+        "Total interfaces checked: %zu",
+        imu_sensor_name_.c_str(), count);
+    }
+  }
+  if (!imu_ang_vel_found[0] || !imu_ang_vel_found[1] || !imu_ang_vel_found[2])
+  {
+    static size_t warn_vel_counter = 0;
+    if (++warn_vel_counter % 125 == 0)  // Warn every 125 calls (~5 seconds at 25Hz)
+    {
+      RCLCPP_WARN(
+        logger,
+        "IMU angular velocity incomplete! Found: [%s, %s, %s]. "
+        "Looking for '%s/angular_velocity.{x,y,z}'. Total interfaces checked: %zu",
+        imu_ang_vel_found[0] ? "yes" : "no", imu_ang_vel_found[1] ? "yes" : "no",
+        imu_ang_vel_found[2] ? "yes" : "no", imu_sensor_name_.c_str(), count);
     }
   }
 

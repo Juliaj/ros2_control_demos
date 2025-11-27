@@ -60,8 +60,8 @@ TEST_F(TestObservationFormatter, ObservationDimension)
 
 TEST_F(TestObservationFormatter, ObservationVectorFormat)
 {
-  // Create test sensor data
-  control_msgs::msg::InterfacesValues sensor_data;
+  // Create test interface data
+  control_msgs::msg::InterfacesValues interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.5;
   velocity_cmd.linear.y = 0.0;
@@ -74,7 +74,8 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
   formatter_->set_default_joint_positions(default_positions);
 
   // Format observation
-  std::vector<float> observation = formatter_->format(sensor_data, velocity_cmd, previous_action);
+  std::vector<float> observation =
+    formatter_->format(interface_data, velocity_cmd, previous_action);
 
   // Verify dimension
   EXPECT_EQ(observation.size(), formatter_->get_observation_dim());
@@ -85,7 +86,7 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
   EXPECT_FLOAT_EQ(observation[2], 0.0f);  // ang_vel_z
   EXPECT_FLOAT_EQ(observation[3], 0.0f);  // heading
 
-  // Verify order: base_angular_velocity (3D) - should be zeros from empty sensor_data
+  // Verify order: base_angular_velocity (3D) - should be zeros from empty interface_data
   EXPECT_FLOAT_EQ(observation[4], 0.0f);
   EXPECT_FLOAT_EQ(observation[5], 0.0f);
   EXPECT_FLOAT_EQ(observation[6], 0.0f);
@@ -97,7 +98,7 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
   EXPECT_FLOAT_EQ(observation[9], -1.0f);
 
   // Verify order: joint_positions (N joints, relative to default)
-  // Since sensor_data is empty, positions are 0.0, relative to default 0.5 = -0.5
+  // Since interface_data is empty, positions are 0.0, relative to default 0.5 = -0.5
   for (size_t i = 0; i < num_joints_; ++i)
   {
     EXPECT_FLOAT_EQ(observation[10 + i], -0.5f);
@@ -118,16 +119,16 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
 
 TEST_F(TestObservationFormatter, RelativeJointPositions)
 {
-  // Create sensor data with joint positions
-  control_msgs::msg::InterfacesValues sensor_data;
+  // Create interface data with joint positions
+  control_msgs::msg::InterfacesValues interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
 
   // Populate values to match interface ordering (position first, velocity second per joint)
-  sensor_data.values.resize(interface_names_.size(), 0.0);
+  interface_data.values.resize(interface_names_.size(), 0.0);
   for (size_t i = 0; i < num_joints_; ++i)
   {
     const size_t pos_idx = i * 2;
-    sensor_data.values[pos_idx] = 1.0;  // Absolute position
+    interface_data.values[pos_idx] = 1.0;  // Absolute position
   }
 
   // Set default positions to 0.5
@@ -137,7 +138,8 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
   std::vector<double> previous_action(num_joints_, 0.0);
 
   // Format observation
-  std::vector<float> observation = formatter_->format(sensor_data, velocity_cmd, previous_action);
+  std::vector<float> observation =
+    formatter_->format(interface_data, velocity_cmd, previous_action);
 
   // Verify joint positions are relative (1.0 - 0.5 = 0.5)
   for (size_t i = 0; i < num_joints_; ++i)
@@ -148,14 +150,15 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
 
 TEST_F(TestObservationFormatter, VelocityCommandFormat)
 {
-  control_msgs::msg::InterfacesValues sensor_data;
+  control_msgs::msg::InterfacesValues interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.3;
   velocity_cmd.linear.y = 0.2;
   velocity_cmd.angular.z = 0.1;
 
   std::vector<double> previous_action(num_joints_, 0.0);
-  std::vector<float> observation = formatter_->format(sensor_data, velocity_cmd, previous_action);
+  std::vector<float> observation =
+    formatter_->format(interface_data, velocity_cmd, previous_action);
 
   // Verify velocity commands are first 4 elements
   EXPECT_FLOAT_EQ(observation[0], 0.3f);  // lin_vel_x

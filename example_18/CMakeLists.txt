@@ -68,6 +68,7 @@ target_include_directories(observation_formatter PUBLIC
 ament_target_dependencies(observation_formatter
   control_msgs
   geometry_msgs
+  rclcpp
 )
 
 # Add library for action processor (used by controller and tests)

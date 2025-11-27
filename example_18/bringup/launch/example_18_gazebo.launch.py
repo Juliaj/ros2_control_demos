@@ -63,7 +63,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "log_level",
-            default_value="info",
+            default_value="debug",
             description="Log level for the locomotion controller (debug, info, warn, error).",
         ),
     ]
@@ -166,13 +166,6 @@ def generate_launch_description():
         parameters=[{"use_sim_time": use_sim_time}],
     )
 
-    imu_sensor_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["imu_sensor_broadcaster_2", "--controller-manager", "/controller_manager"],
-        parameters=[{"use_sim_time": use_sim_time}],
-    )
-
     interfaces_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -202,7 +195,6 @@ def generate_launch_description():
         spawn_entity_node,
         bridge_clock_node,
         joint_state_broadcaster_spawner,
-        imu_sensor_broadcaster_spawner,
         interfaces_state_broadcaster_spawner,
         locomotion_controller_spawner,
     ]

@@ -249,10 +249,10 @@ CallbackReturn LocomotionController::on_configure(
   }
 
   // Create subscribers
-  sensor_data_subscriber_ = get_node()->create_subscription<control_msgs::msg::InterfacesValues>(
+  interface_data_subscriber_ = get_node()->create_subscription<control_msgs::msg::InterfacesValues>(
     interfaces_broadcaster_topic_, rclcpp::SystemDefaultsQoS(),
     [this](const control_msgs::msg::InterfacesValues::SharedPtr msg)
-    { rt_sensor_data_.set(*msg); });
+    { rt_interface_data_.set(*msg); });
 
   interfaces_names_subscriber_ =
     get_node()->create_subscription<control_msgs::msg::InterfacesNames>(
@@ -304,13 +304,13 @@ CallbackReturn LocomotionController::on_deactivate(
 return_type LocomotionController::update(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // Get latest sensor data from thread-safe buffer
-  auto sensor_data_op = rt_sensor_data_.try_get();
-  if (!sensor_data_op.has_value())
+  // Get latest interface data from thread-safe buffer
+  auto interface_data_op = rt_interface_data_.try_get();
+  if (!interface_data_op.has_value())
   {
     return return_type::OK;
   }
-  control_msgs::msg::InterfacesValues sensor_data = sensor_data_op.value();
+  control_msgs::msg::InterfacesValues interface_data = interface_data_op.value();
 
   // Get latest velocity command from thread-safe buffer
   auto velocity_cmd_op = rt_velocity_command_.try_get();
@@ -353,7 +353,7 @@ return_type LocomotionController::update(
   // Initialize default joint positions from current sensor data (first update only)
   if (!default_joint_positions_initialized_)
   {
-    default_joint_positions_ = observation_formatter_->extract_joint_positions(sensor_data);
+    default_joint_positions_ = observation_formatter_->extract_joint_positions(interface_data);
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
 
@@ -396,7 +396,7 @@ return_type LocomotionController::update(
     std::vector<float> model_inputs;
     try
     {
-      model_inputs = observation_formatter_->format(sensor_data, velocity_cmd, previous_action_);
+      model_inputs = observation_formatter_->format(interface_data, velocity_cmd, previous_action_);
 
       // Debug: Log first 4 elements (velocity commands) sent to model
       if (model_inputs.size() >= 4)

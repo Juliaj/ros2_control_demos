@@ -102,12 +102,12 @@ private:
 #endif
 
   // Subscribers
-  rclcpp::Subscription<control_msgs::msg::InterfacesValues>::SharedPtr sensor_data_subscriber_;
+  rclcpp::Subscription<control_msgs::msg::InterfacesValues>::SharedPtr interface_data_subscriber_;
   rclcpp::Subscription<control_msgs::msg::InterfacesNames>::SharedPtr interfaces_names_subscriber_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr velocity_command_subscriber_;
 
   // Thread-safe message buffers
-  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::InterfacesValues> rt_sensor_data_;
+  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::InterfacesValues> rt_interface_data_;
   realtime_tools::RealtimeThreadSafeBox<std::vector<std::string>> rt_interface_names_;
   realtime_tools::RealtimeThreadSafeBox<geometry_msgs::msg::Twist> rt_velocity_command_;
 
