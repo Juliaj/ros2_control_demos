@@ -27,7 +27,8 @@ namespace locomotion_controller
 class ObservationFormatter
 {
 public:
-  explicit ObservationFormatter(const std::vector<std::string> & joint_names);
+  explicit ObservationFormatter(
+    const std::vector<std::string> & joint_names, const std::string & imu_sensor_name = "imu_2");
 
   // Extract sensor data and format into model input vector
   // Observation order (based on
@@ -78,7 +79,7 @@ private:
   std::vector<double> default_joint_positions_;
   bool default_joint_positions_set_;
 
-  // IMU sensor name (configurable, defaults to "imu_1")
+  // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
 
   // Names associated with incoming InterfacesValues message

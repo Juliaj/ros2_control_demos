@@ -90,13 +90,30 @@ Run the demo
 
    .. code-block:: bash
 
-      # Send a 0.5 m/s forward command
+      # IMPORTANT: Send velocity commands to control robot movement
+      # The robot will circle or not move if no commands are received
+      
+      # Send a 0.5 m/s forward command (one-time)
       ros2 topic pub --once /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
-        "{linear: {x: 0.5}, angular: {z: 0.0}}"
+        "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
+      
+      # Send continuous forward command (press Ctrl+C to stop)
+      ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
+        "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
+      
+      # Send turning command
+      ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
+        "{linear: {x: 0.3, y: 0.0}, angular: {z: 0.5}}"
+      
+      # Check if commands are being received (should show non-zero values)
+      ros2 topic echo /locomotion_controller/cmd_vel
 
       # Inspect state/broadcaster streams
       ros2 topic echo /interfaces_state_broadcaster/values --once
       ros2 topic echo /joint_states
+      
+      # Verify controller is receiving commands (check logs for "received=yes")
+      # If "received=no", check topic name matches controller subscription
 
 Expected behaviour: the robot spawns balanced, follows velocity commands, and logs
 warnings if the observation vector dimension deviates from ``10 + 3*N`` (``N=12``).
@@ -236,3 +253,206 @@ If you encounter "Got invalid dimensions for input: obs" error:
    - Compare model's expected input shape with ``env_cfg.py`` observation configuration
 
 For example, if there are 12 leg joints, the observation vector dimension will be 10 + 3*12 = 46.
+
+Debugging Action Quality Issues
+--------------------------------
+
+If you encounter high clamping rates, unstable actions, or the robot falling, check the action quality metrics reported by the controller.
+
+Action Quality Metrics
+~~~~~~~~~~~~~~~~~~~~~~
+
+The controller reports action quality statistics every 100 updates (~4 seconds at 25Hz):
+
+- **Clamping rate**: Percentage of commands that exceed joint limits
+- **Action smoothness**: Average change per step (rad/step)
+- **Extreme actions**: Percentage of actions beyond ±3.0 rad
+- **Most clamped joints**: Joints that frequently exceed limits
+- **Action ranges**: Min/max values observed for each joint
+
+Warning thresholds:
+- Clamping rate > 20%: Actions frequently exceed limits
+- Action change rate > 0.5 rad/step: Actions may be unstable
+- Extreme action rate > 5%: Model may be producing invalid outputs
+
+Common Issues and Solutions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. **High Clamping Rate (>60%)**
+
+   Symptoms:
+   - Most joints clamped every update
+   - Actions frequently exceed limits
+   - Robot unable to execute desired motions
+
+   Diagnostic steps:
+   
+   a. Check raw model outputs (enable debug logging):
+   
+      .. code-block:: bash
+      
+         ros2 launch ros2_control_demo_example_18 example_18_gazebo.launch.py log_level:=debug
+      
+      Look for "Raw model outputs (before scaling)" in logs. Expected range: typically [-1, 1] or [-4, 4].
+      If outputs are >10, the model may be producing wrong values.
+
+   b. Verify action scale:
+   
+      Check ``action_scale`` in ``biped_robot_controllers.yaml`` (default: 0.25).
+      If raw outputs are large, try reducing scale:
+      
+      .. code-block:: yaml
+      
+         action_scale: 0.1  # Try 0.1 instead of 0.25
+
+   c. Enable default joint positions:
+   
+      Uncomment and verify in config:
+      
+      .. code-block:: yaml
+      
+         default_joint_positions: [0.0, 0.0, -0.2, 0.4, -0.3, 0.0, 0.0, 0.0, -0.2, 0.4, -0.3, 0.0]
+
+2. **High Action Change Rate (>0.5 rad/step)**
+
+   Symptoms:
+   - Actions jumping erratically between updates
+   - Robot movements jerky or unstable
+   - High "Action smoothness" values in quality report
+
+   Solutions:
+   
+   a. Verify observation space matches training:
+      - Check if sensor data (IMU, joint states) are in correct units/ranges
+      - Verify observation normalization matches training configuration
+      - Ensure default joint positions are initialized correctly
+
+   b. Check model compatibility:
+      - Verify ONNX model matches training configuration
+      - Compare with Berkeley-Humanoid-Lite training configs
+      - Ensure model was trained with same action scaling
+
+3. **Extreme Actions (>3.0 rad)**
+
+   Symptoms:
+   - Actions beyond reasonable joint ranges
+   - Model producing invalid outputs
+   - High extreme action rate in quality report
+
+   Solutions:
+   
+   a. Check observation formatter:
+      - Verify observation dimensions match model input
+      - Ensure sensor data is properly normalized
+      - Check if IMU and joint state scaling is correct
+
+   b. Verify model inputs:
+      - Check "Observation size mismatch" errors in logs
+      - Verify all sensor data is being received
+      - Ensure previous_action_ is properly initialized
+
+4. **Specific Joint Issues**
+
+   If specific joints are always clamped (e.g., all ankle joints):
+   
+   a. Check joint limits:
+      - Verify limits in ``biped_robot_controllers.yaml`` match ros2_control config
+      - Check for Gazebo limit enforcement issues (see below)
+   
+   b. Check action ranges:
+      - Review "Action ranges" in quality report
+      - Compare with expected joint ranges from training
+      - Verify if model outputs are reasonable for that joint
+
+Gazebo Limit Enforcement Issues
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you see errors like "Command out of limits" with "limited: 0.150000" for hip_roll joints:
+
+- Gazebo's gz_ros_control plugin may misinterpret URDF ``velocity="15"`` as position limit 0.15
+- This is a known issue where Gazebo enforces different limits than ros2_control config
+- The controller uses correct limits ([-0.174533, 1.5708] for hip_roll), but Gazebo rejects commands >0.15
+
+Workarounds:
+- Use conservative limits in controller config that match Gazebo's enforcement
+- Investigate gz_ros_control plugin configuration
+- Check URDF velocity limits aren't being misinterpreted
+
+Action Oscillation Issues
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If action change rate is high (>0.5 rad/step) but actions look reasonable:
+
+Symptoms:
+- Actions oscillating between two states
+- High "Action smoothness" values (e.g., 9.78 rad/step)
+- Robot movements jerky or unstable
+- Actions jumping between values (e.g., hip_roll: -0.13 ↔ 0.32)
+
+Causes:
+- Default joint positions not properly initialized
+- Observation space mismatch causing model instability
+- Model receiving inconsistent sensor data
+- Action smoothing/filtering needed
+
+Solutions:
+
+a. Verify default joint positions initialization:
+   
+   Check logs for:
+   
+   .. code-block:: bash
+   
+      "Using default joint positions from parameters"  # Good
+      "will initialize from sensor data"  # May cause issues
+   
+   If using sensor initialization, ensure positions are stable before first command.
+   Consider explicitly setting default_joint_positions in config.
+
+b. Check for observation inconsistencies:
+   
+   - Verify IMU data is stable and properly scaled
+   - Check joint state data is consistent
+   - Ensure observation formatter is using correct reference frames
+   - Verify previous_action is properly maintained
+
+c. Consider action smoothing (if needed):
+   
+   Add low-pass filtering or rate limiting to smooth actions:
+   - Limit max change per step (e.g., 0.5 rad/step)
+   - Apply exponential smoothing to actions
+   - Filter high-frequency oscillations
+
+Gazebo Dynamic Limit Issues
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you see "limited" values that change based on current position:
+
+Example:
+- Command: 0.325634, limited to: 0.091136 (current pos: 0.048465)
+- Command: -0.130383, limited to: -0.058864 (current pos: -0.000000)
+
+This indicates Gazebo is enforcing velocity-based safety limits or position-dependent constraints.
+
+Solutions:
+- These are safety limits and may be intentional
+- Commands within these limits should work
+- If problematic, investigate Gazebo plugin configuration
+- Consider using more conservative controller limits that account for these constraints
+
+Troubleshooting Checklist
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. Enable debug logging and check raw model outputs
+2. Verify action_scale parameter (try reducing if outputs are large)
+3. Enable and verify default_joint_positions
+4. Check observation space matches training configuration
+5. Verify model compatibility with training setup
+6. Review action quality reports for patterns
+7. Check for specific joint limit issues
+8. Verify sensor data (IMU, joints) are correct
+9. Compare action ranges with expected values from training
+10. Check for observation dimension mismatches
+11. Investigate action oscillation patterns
+12. Verify default joint positions are stable
+13. Check for Gazebo dynamic limit constraints

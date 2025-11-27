@@ -21,12 +21,13 @@
 namespace locomotion_controller
 {
 
-ObservationFormatter::ObservationFormatter(const std::vector<std::string> & joint_names)
+ObservationFormatter::ObservationFormatter(
+  const std::vector<std::string> & joint_names, const std::string & imu_sensor_name)
 : joint_names_(joint_names),
   num_joints_(joint_names.size()),
   default_joint_positions_(num_joints_, 0.0),
   default_joint_positions_set_(false),
-  imu_sensor_name_("imu_1")
+  imu_sensor_name_(imu_sensor_name)
 {
   // Observation dimension: 4 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity)
   // + N (joint_pos) + N (joint_vel) + N (actions) = 10 + 3*N
@@ -85,6 +86,9 @@ std::vector<float> ObservationFormatter::format(
   }
 
   // 4. Joint positions (N joints, relative to default positions)
+  // Basis: Berkeley-Humanoid-Lite uses joint_pos_rel (from IsaacLab MDP) which computes
+  // relative positions (joint_pos - default_joint_pos) for better generalization and
+  // pose-invariant observations
   if (default_joint_positions_set_ && joint_positions.size() == default_joint_positions_.size())
   {
     for (size_t i = 0; i < joint_positions.size(); ++i)
@@ -101,8 +105,11 @@ std::vector<float> ObservationFormatter::format(
     }
   }
 
-  // 5. Joint velocities (N joints, relative - currently using absolute)
-  // Note: Relative velocities would require tracking previous velocities
+  // 5. Joint velocities (N joints, relative)
+  // Basis: Berkeley-Humanoid-Lite uses joint_vel_rel (from IsaacLab MDP)
+  // Using raw joint velocities from sensors, which should match the expected format
+  // TODO: Verify what "relative" means in joint_vel_rel - check IsaacLab documentation
+  // to ensure we're computing velocities correctly (e.g., relative to what reference?)
   for (const auto & val : joint_velocities)
   {
     observation.push_back(static_cast<float>(val));
@@ -175,7 +182,8 @@ std::vector<float> ObservationFormatter::format_velocity_commands(
   return {
     static_cast<float>(velocity_cmd.linear.x), static_cast<float>(velocity_cmd.linear.y),
     static_cast<float>(velocity_cmd.angular.z),
-    0.0f  // heading (not available in Twist message)
+    0.0f  // heading (not available in Twist message): 0.0 = no heading change (maintain current
+          // direction)
   };
 }
 
@@ -207,46 +215,36 @@ void ObservationFormatter::extract_sensor_data(
     const std::string & name = interface_names_[idx];
     const double value = msg.values[idx];
 
-    // Extract base angular velocity from IMU (try multiple naming conventions)
-    std::string imu_ang_vel_x = imu_sensor_name_ + "/angular_velocity/x";
-    std::string imu_ang_vel_y = imu_sensor_name_ + "/angular_velocity/y";
-    std::string imu_ang_vel_z = imu_sensor_name_ + "/angular_velocity/z";
-
-    if (
-      name == imu_ang_vel_x || name == "imu/angular_velocity/x" ||
-      name == "imu_1/angular_velocity/x")
+    // Extract base angular velocity from IMU
+    if (name == imu_sensor_name_ + "/angular_velocity.x")
     {
       base_angular_velocity[0] = value;
     }
-    else if (
-      name == imu_ang_vel_y || name == "imu/angular_velocity/y" ||
-      name == "imu_1/angular_velocity/y")
+    else if (name == imu_sensor_name_ + "/angular_velocity.y")
     {
       base_angular_velocity[1] = value;
     }
-    else if (
-      name == imu_ang_vel_z || name == "imu/angular_velocity/z" ||
-      name == "imu_1/angular_velocity/z")
+    else if (name == imu_sensor_name_ + "/angular_velocity.z")
     {
       base_angular_velocity[2] = value;
     }
     // Extract IMU orientation quaternion
-    else if (name == imu_sensor_name_ + "/orientation/x" || name == "imu_1/orientation/x")
+    else if (name == imu_sensor_name_ + "/orientation.x")
     {
       imu_orientation_x = value;
       imu_orientation_found = true;
     }
-    else if (name == imu_sensor_name_ + "/orientation/y" || name == "imu_1/orientation/y")
+    else if (name == imu_sensor_name_ + "/orientation.y")
     {
       imu_orientation_y = value;
       imu_orientation_found = true;
     }
-    else if (name == imu_sensor_name_ + "/orientation/z" || name == "imu_1/orientation/z")
+    else if (name == imu_sensor_name_ + "/orientation.z")
     {
       imu_orientation_z = value;
       imu_orientation_found = true;
     }
-    else if (name == imu_sensor_name_ + "/orientation/w" || name == "imu_1/orientation/w")
+    else if (name == imu_sensor_name_ + "/orientation.w")
     {
       imu_orientation_w = value;
       imu_orientation_found = true;
@@ -269,6 +267,8 @@ void ObservationFormatter::extract_sensor_data(
   }
 
   // Compute projected gravity vector from IMU orientation
+  // Basis: Berkeley-Humanoid-Lite uses quat_rotate_inverse(base_quat, gravity_vector)
+  // to transform gravity from world frame [0, 0, -1] to robot body frame
   if (imu_orientation_found)
   {
     compute_projected_gravity(
@@ -288,9 +288,9 @@ void ObservationFormatter::extract_sensor_data(
 void ObservationFormatter::compute_projected_gravity(
   double qx, double qy, double qz, double qw, std::vector<double> & projected_gravity)
 {
-  // Gravity vector in world frame (assuming z-up): [0, 0, -9.81]
-  // Projected gravity = R^T * [0, 0, -1] where R is rotation matrix from quaternion
-  // This gives gravity direction in robot body frame
+  // Basis: Equivalent to quat_rotate_inverse(q, [0, 0, -1]) from Berkeley-Humanoid-Lite
+  // Rotates gravity vector from world frame to robot body frame using inverse quaternion
+  // Implementation uses rotation matrix: R^T * [0, 0, -1] where R is from quaternion
 
   // Normalize quaternion
   double norm = std::sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
@@ -302,12 +302,7 @@ void ObservationFormatter::compute_projected_gravity(
     qw /= norm;
   }
 
-  // Rotate gravity vector [0, 0, -1] by inverse quaternion (conjugate)
-  // Inverse quaternion: [qx, qy, qz, qw] -> [-qx, -qy, -qz, qw]
-  // For a vector v, rotated vector = q * v * q^-1
-  // Simplified: R^T * [0, 0, -1] where R is rotation matrix
-
-  // Compute rotation matrix elements (row-major)
+  // Compute rotation matrix elements (third column = z-axis in body frame)
   double r02 = 2 * (qx * qz + qy * qw);
   double r12 = 2 * (qy * qz - qx * qw);
   double r22 = 1 - 2 * (qx * qx + qy * qy);

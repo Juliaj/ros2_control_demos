@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <iomanip>
 #include <limits>
 #include <regex>
+#include <sstream>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "controller_interface/controller_interface.hpp"
@@ -45,6 +47,10 @@ CallbackReturn LocomotionController::on_init()
       "joint_position_limits_min", std::vector<double>());
     get_node()->declare_parameter<std::vector<double>>(
       "joint_position_limits_max", std::vector<double>());
+    get_node()->declare_parameter<double>("action_scale", 0.25);
+    get_node()->declare_parameter<std::vector<double>>(
+      "default_joint_positions", std::vector<double>());
+    get_node()->declare_parameter<std::string>("imu_sensor_name", "imu_2");
   }
   catch (const std::exception & e)
   {
@@ -116,18 +122,91 @@ CallbackReturn LocomotionController::on_configure(
     command_interface_names_.push_back(joint_name + "/position");
   }
 
+  // TODO(juliaj): Check whteher this is valid.
   // Initialize previous action to zeros
   previous_action_.resize(joint_names_.size(), 0.0);
 
+  // Initialize action quality monitoring
+  update_count_ = 0;
+  total_clamps_ = 0;
+  joint_clamp_counts_.resize(joint_names_.size(), 0);
+  action_max_values_.resize(joint_names_.size(), -std::numeric_limits<double>::infinity());
+  action_min_values_.resize(joint_names_.size(), std::numeric_limits<double>::infinity());
+  previous_joint_commands_.resize(joint_names_.size(), 0.0);
+  total_action_change_ = 0.0;
+  extreme_action_count_ = 0;
+
+  // Read IMU sensor name parameter
+  std::string imu_sensor_name = get_node()->get_parameter("imu_sensor_name").as_string();
+  RCLCPP_INFO(get_node()->get_logger(), "IMU sensor name: %s", imu_sensor_name.c_str());
+
   // Initialize observation formatter
-  observation_formatter_ = std::make_unique<ObservationFormatter>(joint_names_);
+  observation_formatter_ = std::make_unique<ObservationFormatter>(joint_names_, imu_sensor_name);
 
-  // Initialize action processor (scale=0.25, use_default_offset=true from env_cfg.py)
-  action_processor_ = std::make_unique<ActionProcessor>(joint_names_, 0.25, true);
+  // Read action_scale parameter
+  double action_scale = get_node()->get_parameter("action_scale").as_double();
+  RCLCPP_INFO(get_node()->get_logger(), "Action scale: %.6f", action_scale);
 
-  // Initialize default joint positions (will be set from sensor data on first update)
+  // Initialize action processor with configurable scale
+  action_processor_ = std::make_unique<ActionProcessor>(joint_names_, action_scale, true);
+
+  // Read default_joint_positions parameter (optional)
+  std::vector<double> param_default_positions =
+    get_node()->get_parameter("default_joint_positions").as_double_array();
+
+  // Initialize default joint positions
   default_joint_positions_.resize(joint_names_.size(), 0.0);
-  default_joint_positions_initialized_ = false;
+  if (param_default_positions.size() == joint_names_.size())
+  {
+    // Use positions from config
+    default_joint_positions_ = param_default_positions;
+    observation_formatter_->set_default_joint_positions(default_joint_positions_);
+    default_joint_positions_initialized_ = true;
+    RCLCPP_INFO(
+      get_node()->get_logger(), "Using default joint positions from parameters (%zu joints)",
+      default_joint_positions_.size());
+
+    // Log default positions for verification
+    std::stringstream pos_info;
+    pos_info << "Default joint positions: ";
+    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
+    {
+      if (i > 0) pos_info << ", ";
+      pos_info << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
+               << default_joint_positions_[i];
+    }
+    RCLCPP_INFO(get_node()->get_logger(), "%s", pos_info.str().c_str());
+
+    // Validate default positions are within reasonable bounds
+    bool positions_valid = true;
+    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
+    {
+      if (std::abs(default_joint_positions_[i]) > 3.14)
+      {
+        RCLCPP_WARN(
+          get_node()->get_logger(),
+          "Default position for joint '%s' (%.4f) exceeds reasonable bounds (±π)",
+          joint_names_[i].c_str(), default_joint_positions_[i]);
+        positions_valid = false;
+      }
+    }
+    if (positions_valid)
+    {
+      RCLCPP_INFO(
+        get_node()->get_logger(),
+        "Default joint positions validated: all within reasonable bounds");
+    }
+  }
+  else
+  {
+    // Will be set from sensor data on first update
+    default_joint_positions_initialized_ = false;
+    RCLCPP_WARN(
+      get_node()->get_logger(),
+      "Default joint positions not provided (got %zu, expected %zu). "
+      "Will initialize from sensor data on first update - this may cause instability!",
+      param_default_positions.size(), joint_names_.size());
+  }
 
   // Initialize joint position limits
   // Try to read from parameters first, otherwise use defaults from ros2_control config
@@ -185,6 +264,12 @@ CallbackReturn LocomotionController::on_configure(
     velocity_command_topic_, rclcpp::SystemDefaultsQoS(),
     [this](const geometry_msgs::msg::Twist::SharedPtr msg) { rt_velocity_command_.set(*msg); });
 
+  // Log the topic name being subscribed to
+  // Note: ~/cmd_vel expands to /<node_namespace>/cmd_vel (e.g., /locomotion_controller/cmd_vel)
+  RCLCPP_INFO(
+    get_node()->get_logger(), "Subscribed to velocity command topic: %s (node namespace: %s)",
+    velocity_command_topic_.c_str(), get_node()->get_namespace());
+
   RCLCPP_INFO(get_node()->get_logger(), "Configure successful");
   return CallbackReturn::SUCCESS;
 }
@@ -230,9 +315,33 @@ return_type LocomotionController::update(
   // Get latest velocity command from thread-safe buffer
   auto velocity_cmd_op = rt_velocity_command_.try_get();
   geometry_msgs::msg::Twist velocity_cmd;
+  bool velocity_cmd_received = false;
   if (velocity_cmd_op.has_value())
   {
     velocity_cmd = velocity_cmd_op.value();
+    velocity_cmd_received = true;
+  }
+
+  // Log velocity commands for debugging (throttled)
+  RCLCPP_INFO_THROTTLE(
+    get_node()->get_logger(), *get_node()->get_clock(), 2000,
+    "Velocity command: lin_x=%.4f, lin_y=%.4f, ang_z=%.4f (received=%s)", velocity_cmd.linear.x,
+    velocity_cmd.linear.y, velocity_cmd.angular.z, velocity_cmd_received ? "yes" : "no");
+
+  // Check if velocity command is effectively zero (no movement command)
+  const double vel_tolerance = 1e-6;
+  bool is_zero_command =
+    !velocity_cmd_received || (std::abs(velocity_cmd.linear.x) < vel_tolerance &&
+                               std::abs(velocity_cmd.linear.y) < vel_tolerance &&
+                               std::abs(velocity_cmd.angular.z) < vel_tolerance);
+
+  // Warn if no velocity command received (robot may not move as expected)
+  if (!velocity_cmd_received)
+  {
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 5000,
+      "No velocity command received - using default joint positions to maintain stable pose. "
+      "Send commands to /locomotion_controller/cmd_vel topic to control robot movement.");
   }
 
   // Refresh interface name mapping when broadcaster publishes it
@@ -247,60 +356,166 @@ return_type LocomotionController::update(
     default_joint_positions_ = observation_formatter_->extract_joint_positions(sensor_data);
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
-    RCLCPP_INFO(
-      get_node()->get_logger(), "Initialized default joint positions from current sensor data");
+
+    // Log initialized positions for verification
+    std::stringstream pos_info;
+    pos_info << "Initialized default joint positions from sensor data: ";
+    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
+    {
+      if (i > 0) pos_info << ", ";
+      pos_info << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
+               << default_joint_positions_[i];
+    }
+    RCLCPP_WARN(get_node()->get_logger(), "%s", pos_info.str().c_str());
+    RCLCPP_WARN(
+      get_node()->get_logger(),
+      "WARNING: Using sensor-initialized default positions may cause instability. "
+      "Consider setting default_joint_positions in config for stable operation.");
   }
 
-  // Format inputs for model using ObservationFormatter
-  std::vector<float> model_inputs;
-  try
-  {
-    model_inputs = observation_formatter_->format(sensor_data, velocity_cmd, previous_action_);
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_ERROR_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 1000, "Failed to format observation: %s",
-      e.what());
-    return return_type::ERROR;
-  }
+  std::vector<double> model_outputs;
+  std::vector<double> joint_commands;
 
-  // Debug: Log observation dimensions
-  size_t expected_dim = observation_formatter_->get_observation_dim();
-  if (model_inputs.size() != expected_dim)
+  // If zero command, use default positions directly (skip model inference to maintain stable pose)
+  if (is_zero_command)
   {
-    RCLCPP_ERROR_THROTTLE(
+    RCLCPP_DEBUG_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 2000,
+      "Zero velocity command detected - using default joint positions to maintain stable pose");
+
+    // Use default positions as joint commands (model outputs are zero for relative positions)
+    model_outputs = std::vector<double>(joint_names_.size(), 0.0);
+    joint_commands = default_joint_positions_;
+
+    // Store zero action as previous for next iteration
+    previous_action_ = model_outputs;
+  }
+  else
+  {
+    // Format inputs for model using ObservationFormatter
+    std::vector<float> model_inputs;
+    try
+    {
+      model_inputs = observation_formatter_->format(sensor_data, velocity_cmd, previous_action_);
+
+      // Debug: Log first 4 elements (velocity commands) sent to model
+      if (model_inputs.size() >= 4)
+      {
+        RCLCPP_DEBUG_THROTTLE(
+          get_node()->get_logger(), *get_node()->get_clock(), 2000,
+          "Velocity commands sent to model: [lin_x=%.4f, lin_y=%.4f, ang_z=%.4f, heading=%.4f]",
+          model_inputs[0], model_inputs[1], model_inputs[2], model_inputs[3]);
+      }
+    }
+    catch (const std::exception & e)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 1000,
+        "Failed to format observation: %s", e.what());
+      return return_type::ERROR;
+    }
+
+    // Debug: Log observation dimensions
+    size_t expected_dim = observation_formatter_->get_observation_dim();
+    if (model_inputs.size() != expected_dim)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 5000,
+        "Observation size mismatch: got %zu, expected %zu", model_inputs.size(), expected_dim);
+      return return_type::ERROR;
+    }
+
+    // Run model inference (returns relative joint positions, scaled by 0.25)
+    model_outputs = run_model_inference(model_inputs);
+
+    // Debug: Log raw model outputs to diagnose action quality issues
+    RCLCPP_DEBUG_THROTTLE(
       get_node()->get_logger(), *get_node()->get_clock(), 5000,
-      "Observation size mismatch: got %zu, expected %zu", model_inputs.size(), expected_dim);
-    return return_type::ERROR;
+      "Raw model outputs (before scaling): [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, "
+      "%.4f, %.4f, %.4f]",
+      model_outputs.size() > 0 ? model_outputs[0] : 0.0,
+      model_outputs.size() > 1 ? model_outputs[1] : 0.0,
+      model_outputs.size() > 2 ? model_outputs[2] : 0.0,
+      model_outputs.size() > 3 ? model_outputs[3] : 0.0,
+      model_outputs.size() > 4 ? model_outputs[4] : 0.0,
+      model_outputs.size() > 5 ? model_outputs[5] : 0.0,
+      model_outputs.size() > 6 ? model_outputs[6] : 0.0,
+      model_outputs.size() > 7 ? model_outputs[7] : 0.0,
+      model_outputs.size() > 8 ? model_outputs[8] : 0.0,
+      model_outputs.size() > 9 ? model_outputs[9] : 0.0,
+      model_outputs.size() > 10 ? model_outputs[10] : 0.0,
+      model_outputs.size() > 11 ? model_outputs[11] : 0.0);
+
+    // Process model outputs: apply scaling and default offset to get absolute positions
+    joint_commands = action_processor_->process(model_outputs, default_joint_positions_);
+
+    // Store current action as previous for next iteration (use raw model outputs, not processed)
+    previous_action_ = model_outputs;
   }
 
-  // Run model inference (returns relative joint positions, scaled by 0.25)
-  std::vector<double> model_outputs = run_model_inference(model_inputs);
+  // Debug: Log all joint commands before clamping (compact format)
+  std::stringstream debug_before;
+  debug_before << "Joint commands (before clamping): ";
+  for (size_t i = 0; i < joint_commands.size() && i < joint_names_.size(); ++i)
+  {
+    if (i > 0) debug_before << ", ";
+    debug_before << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
+                 << joint_commands[i];
+  }
+  RCLCPP_DEBUG_THROTTLE(
+    get_node()->get_logger(), *get_node()->get_clock(), 2000, "%s", debug_before.str().c_str());
 
-  // Process model outputs: apply scaling and default offset to get absolute positions
-  std::vector<double> joint_commands =
-    action_processor_->process(model_outputs, default_joint_positions_);
+  // Info: Log summary of all joint commands with names (throttled to avoid spam)
+  std::stringstream info_summary;
+  info_summary << "Actions for all joints: ";
+  for (size_t i = 0; i < joint_commands.size() && i < joint_names_.size(); ++i)
+  {
+    if (i > 0) info_summary << ", ";
+    info_summary << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
+                 << joint_commands[i];
+  }
+  RCLCPP_INFO_THROTTLE(
+    get_node()->get_logger(), *get_node()->get_clock(), 5000, "%s", info_summary.str().c_str());
 
-  // Store current action as previous for next iteration (use raw model outputs, not processed)
-  previous_action_ = model_outputs;
+  // Track action quality metrics
+  size_t num_clamped = 0;
+  double total_change = 0.0;
 
   // Write joint commands to hardware interfaces (with clamping to limits)
-  // TODO: Consider querying limits from command interface at runtime instead of using
+  // TODO(juliaj): Consider querying limits from command interface at runtime instead of using
   // hardcoded values. This would ensure limits match what Gazebo/hardware actually enforces.
   for (size_t i = 0; i < command_interfaces_.size() && i < joint_commands.size(); ++i)
   {
+    // Track action statistics
+    action_max_values_[i] = std::max(action_max_values_[i], joint_commands[i]);
+    action_min_values_[i] = std::min(action_min_values_[i], joint_commands[i]);
+
+    // Track action smoothness (rate of change)
+    if (update_count_ > 0)
+    {
+      double change = std::abs(joint_commands[i] - previous_joint_commands_[i]);
+      total_change += change;
+    }
+
     // Clamp command to joint limits
     double clamped_command =
       std::clamp(joint_commands[i], joint_position_limits_min_[i], joint_position_limits_max_[i]);
 
     if (clamped_command != joint_commands[i])
     {
+      num_clamped++;
+      joint_clamp_counts_[i]++;
       RCLCPP_WARN_THROTTLE(
         get_node()->get_logger(), *get_node()->get_clock(), 1000,
         "Joint '%s' command clamped from %.6f to %.6f (limits: [%.6f, %.6f])",
         joint_names_[i].c_str(), joint_commands[i], clamped_command, joint_position_limits_min_[i],
         joint_position_limits_max_[i]);
+    }
+
+    // Detect extreme actions (beyond reasonable bounds)
+    if (std::abs(joint_commands[i]) > 3.0)
+    {
+      extreme_action_count_++;
     }
 
     // Additional safety check: if command is still out of reasonable bounds, log error
@@ -318,9 +533,37 @@ return_type LocomotionController::update(
     {
       RCLCPP_WARN_THROTTLE(
         get_node()->get_logger(), *get_node()->get_clock(), 1000,
-        "Failed to set command for joint '%s' to %.6f", joint_names_[i].c_str(), clamped_command);
+        "Failed to set command for joint '%s' to %.6f (limits: [%.6f, %.6f])",
+        joint_names_[i].c_str(), clamped_command, joint_position_limits_min_[i],
+        joint_position_limits_max_[i]);
     }
   }
+
+  // Debug: Log all joint commands after clamping (compact format)
+  std::stringstream debug_after;
+  debug_after << "Joint commands (after clamping): ";
+  for (size_t i = 0; i < command_interfaces_.size() && i < joint_commands.size(); ++i)
+  {
+    if (i > 0) debug_after << ", ";
+    double clamped_cmd =
+      std::clamp(joint_commands[i], joint_position_limits_min_[i], joint_position_limits_max_[i]);
+    debug_after << joint_names_[i] << "=" << std::fixed << std::setprecision(4) << clamped_cmd;
+    if (clamped_cmd != joint_commands[i])
+    {
+      debug_after << "(clamped)";
+    }
+  }
+  RCLCPP_DEBUG_THROTTLE(
+    get_node()->get_logger(), *get_node()->get_clock(), 2000, "%s", debug_after.str().c_str());
+
+  // Update action quality metrics
+  update_count_++;
+  total_clamps_ += num_clamped;
+  total_action_change_ += total_change;
+  previous_joint_commands_ = joint_commands;
+
+  // Report action quality statistics periodically
+  report_action_quality(joint_commands, num_clamped);
 
   return return_type::OK;
 }
@@ -334,7 +577,7 @@ void LocomotionController::initialize_joint_limits()
     const std::string & joint_name = joint_names_[i];
 
     // Set limits based on joint name (matching ros2_control config)
-    // TODO: Investigate Gazebo limit enforcement discrepancy
+    // TODO(juliaj): Investigate Gazebo limit enforcement discrepancy
     // Gazebo has been observed limiting commands to 0.150000 for leg_left_hip_roll_joint,
     // which doesn't match the URDF/ros2_control config limits (-0.174533 to 1.5708).
     // Commands within our configured range (e.g., 0.726533) are being rejected by Gazebo.
@@ -348,10 +591,11 @@ void LocomotionController::initialize_joint_limits()
     //   - Investigate Gazebo world/plugin configuration for limit overrides
     if (joint_name == "leg_left_hip_roll_joint" || joint_name == "leg_right_hip_roll_joint")
     {
-      // TODO: Replace with actual limit querying or proper Gazebo limit configuration
-      // Currently using conservative limits as workaround
-      joint_position_limits_min_[i] = -0.2;
-      joint_position_limits_max_[i] = 0.2;
+      // Matching ros2_control config: berkeley_humanoid_lite_biped.ros2_control.xacro
+      // NOTE: Gazebo may enforce different limits (0.15) due to gz_ros_control plugin bug
+      // where URDF velocity="15" is misinterpreted as position limit. This is a known issue.
+      joint_position_limits_min_[i] = -0.174533;
+      joint_position_limits_max_[i] = 1.5708;
     }
     else if (joint_name == "leg_left_hip_yaw_joint" || joint_name == "leg_right_hip_yaw_joint")
     {
@@ -382,6 +626,96 @@ void LocomotionController::initialize_joint_limits()
       joint_position_limits_max_[i] = 0.261799;
     }
     // For unknown joints, use no limits (already set to +/- infinity)
+  }
+}
+
+void LocomotionController::report_action_quality(
+  const std::vector<double> & /* joint_commands */, size_t /* num_clamped */)
+{
+  // Report statistics every 100 updates (~4 seconds at 25Hz)
+  if (update_count_ % 100 == 0 && update_count_ > 0)
+  {
+    double clamp_rate =
+      (100.0 * static_cast<double>(total_clamps_)) /
+      (static_cast<double>(update_count_) * static_cast<double>(joint_names_.size()));
+    double avg_action_change = total_action_change_ / static_cast<double>(update_count_ - 1);
+    double extreme_rate =
+      (100.0 * static_cast<double>(extreme_action_count_)) /
+      (static_cast<double>(update_count_) * static_cast<double>(joint_names_.size()));
+
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 10000,
+      "=== Action Quality Report (after %zu updates) ===", update_count_);
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 10000,
+      "Clamping: %.2f%% of commands clamped (total: %zu)", clamp_rate, total_clamps_);
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 10000,
+      "Action smoothness: avg change per step = %.6f rad", avg_action_change);
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 10000,
+      "Extreme actions (>3.0 rad): %.2f%%", extreme_rate);
+
+    // Report most frequently clamped joints
+    std::vector<std::pair<size_t, size_t>> clamp_ranking;
+    for (size_t i = 0; i < joint_clamp_counts_.size(); ++i)
+    {
+      if (joint_clamp_counts_[i] > 0)
+      {
+        clamp_ranking.push_back({i, joint_clamp_counts_[i]});
+      }
+    }
+    std::sort(
+      clamp_ranking.begin(), clamp_ranking.end(),
+      [](const auto & a, const auto & b) { return a.second > b.second; });
+
+    if (!clamp_ranking.empty())
+    {
+      std::stringstream clamp_info;
+      clamp_info << "Most clamped joints: ";
+      for (size_t i = 0; i < std::min(clamp_ranking.size(), size_t(5)); ++i)
+      {
+        if (i > 0) clamp_info << ", ";
+        clamp_info << joint_names_[clamp_ranking[i].first] << "(" << clamp_ranking[i].second
+                   << "x)";
+      }
+      RCLCPP_WARN_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 10000, "%s", clamp_info.str().c_str());
+    }
+
+    // Report action ranges
+    std::stringstream range_info;
+    range_info << "Action ranges: ";
+    for (size_t i = 0; i < std::min(joint_names_.size(), size_t(6)); ++i)
+    {
+      if (i > 0) range_info << ", ";
+      range_info << joint_names_[i] << "[" << std::fixed << std::setprecision(3)
+                 << action_min_values_[i] << "," << action_max_values_[i] << "]";
+    }
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 10000, "%s", range_info.str().c_str());
+
+    // Check for problematic patterns
+    if (clamp_rate > 20.0)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 10000,
+        "WARNING: High clamping rate (%.2f%%) - actions frequently exceed limits!", clamp_rate);
+    }
+    if (avg_action_change > 0.5)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 10000,
+        "WARNING: High action change rate (%.6f rad/step) - actions may be unstable!",
+        avg_action_change);
+    }
+    if (extreme_rate > 5.0)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 10000,
+        "WARNING: High extreme action rate (%.2f%%) - model may be producing invalid outputs!",
+        extreme_rate);
+    }
   }
 }
 

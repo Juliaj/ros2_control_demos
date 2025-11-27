@@ -25,3 +25,18 @@ locomotion_controller:
     default_value: "~/cmd_vel",
     description: "Topic name for velocity commands (geometry_msgs/Twist)"
   }
+  action_scale: {
+    type: double,
+    default_value: 0.25,
+    description: "Scale factor for model outputs (default: 0.25 from env_cfg.py)"
+  }
+  default_joint_positions: {
+    type: double_array,
+    default_value: [],
+    description: "Default joint positions for action offset. If empty or size mismatch, will be initialized from sensor data on first update."
+  }
+  imu_sensor_name: {
+    type: string,
+    default_value: "imu_2",
+    description: "Name of the IMU sensor to use for base angular velocity and projected gravity vector"
+  }

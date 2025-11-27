@@ -63,7 +63,7 @@ private:
   // Load ML model (ONNX or other format)
   bool load_model(const std::string & model_path);
 
-  // Run model inference
+  // Run model inference - ONNX runtime expects float inputs
   std::vector<double> run_model_inference(const std::vector<float> & inputs);
 
   // Initialize joint position limits from ros2_control config
@@ -87,8 +87,11 @@ private:
 
   // Model runtime (ONNX Runtime)
 #ifdef ONNXRUNTIME_FOUND
+  // Session corresponding to the ONNX model
   std::unique_ptr<Ort::Session> onnx_session_;
+  // ONNX Runtime environment managing logging and global state
   std::unique_ptr<Ort::Env> onnx_env_;
+  // Memory allocation information for tensor creation (CPU, arena allocator)
   std::unique_ptr<Ort::MemoryInfo> onnx_memory_info_;
   std::vector<std::string> input_names_;
   std::vector<std::string> output_names_;
@@ -128,6 +131,19 @@ private:
   // Joint position limits (min/max) for clamping commands
   std::vector<double> joint_position_limits_min_;
   std::vector<double> joint_position_limits_max_;
+
+  // ONNX Runtime: Action quality monitoring
+  size_t update_count_;
+  size_t total_clamps_;
+  std::vector<size_t> joint_clamp_counts_;
+  std::vector<double> action_max_values_;
+  std::vector<double> action_min_values_;
+  std::vector<double> previous_joint_commands_;
+  double total_action_change_;
+  size_t extreme_action_count_;
+
+  // Report action quality statistics
+  void report_action_quality(const std::vector<double> & joint_commands, size_t num_clamped);
 };
 
 }  // namespace locomotion_controller

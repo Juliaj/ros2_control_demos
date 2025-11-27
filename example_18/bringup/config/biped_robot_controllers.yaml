@@ -72,6 +72,10 @@ interfaces_state_broadcaster:
 
 locomotion_controller:
   ros__parameters:
+    # Configuration reference:
+    # This controller's parameters are based on Berkeley-Humanoid-Lite configs.
+    # See: Berkeley-Humanoid-Lite/configs/policy_biped_25hz_b.yaml
+    # for the source configuration file with matching parameter values.
     update_rate: 25
     joints:
       - leg_left_hip_roll_joint
@@ -89,7 +93,34 @@ locomotion_controller:
     model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/policy_biped_25hz_a.onnx"
     interfaces_broadcaster_topic: "interfaces_state_broadcaster/values"
     velocity_command_topic: "~/cmd_vel"
-    # Joint position limits (min/max) - more conservative than URDF to avoid Gazebo errors
-    # If not specified, defaults from ros2_control config will be used
-    joint_position_limits_min: [-0.2, -0.98, -1.9, -0.0, -0.78, -0.26, -0.2, -0.98, -1.9, -0.0, -0.78, -0.26]
-    joint_position_limits_max: [0.2, 0.59, 0.98, 2.44, 0.78, 0.26, 0.2, 0.59, 0.98, 2.44, 0.78, 0.26]
+    # Action processing parameters
+    # Reference: Berkeley-Humanoid-Lite/configs/policy_biped_25hz_b.yaml
+    action_scale: 0.1  # From policy_biped_25hz_b.yaml
+
+    # IMU sensor configuration
+    # Must match the sensor name used in interfaces_state_broadcaster
+    imu_sensor_name: "imu_2"
+
+    # Default joint positions - required for stable action computation
+    # Reference: Berkeley-Humanoid-Lite/configs/policy_biped_25hz_b.yaml (default_joint_positions)
+    # Order: left_hip_roll, left_hip_yaw, left_hip_pitch, left_knee, left_ankle_pitch, left_ankle_roll,
+    #        right_hip_roll, right_hip_yaw, right_hip_pitch, right_knee, right_ankle_pitch, right_ankle_roll
+    # If not provided, will be initialized from sensor data (may cause instability)
+    default_joint_positions: [0.0, 0.0, -0.2, 0.4, -0.3, 0.0, 0.0, 0.0, -0.2, 0.4, -0.3, 0.0]
+
+    # Joint position limits (min/max) - matching ros2_control config from berkeley_humanoid_lite_biped.ros2_control.xacro
+    # Order: left_hip_roll, left_hip_yaw, left_hip_pitch, left_knee, left_ankle_pitch, left_ankle_roll,
+    #        right_hip_roll, right_hip_yaw, right_hip_pitch, right_knee, right_ankle_pitch, right_ankle_roll
+    #
+    # WARNING: Gazebo's gz_ros_control plugin may enforce different limits (0.15 for hip_roll)
+    # than specified here, causing "Command out of limits" errors. This appears to be a bug where
+    # URDF velocity="15" is misinterpreted as position limit 0.15. If errors persist, investigate:
+    # 1. Check if gz_ros_control plugin is reading URDF limits instead of ros2_control config
+    # 2. Verify URDF velocity limits aren't being misinterpreted
+    # 3. Consider updating gz_ros_control plugin or URDF parsing logic
+    #
+    # ros2_control limits: hip_roll: [-0.174533, 1.5708], hip_yaw: [-0.981748, 0.589049],
+    #                      hip_pitch: [-1.89805, 0.981748], knee: [-3.16192e-13, 2.44346],
+    #                      ankle_pitch: [-0.785398, 0.785398], ankle_roll: [-0.261799, 0.261799]
+    joint_position_limits_min: [-0.174533, -0.981748, -1.89805, -0.0, -0.785398, -0.261799, -0.174533, -0.981748, -1.89805, -0.0, -0.785398, -0.261799]
+    joint_position_limits_max: [1.5708, 0.589049, 0.981748, 2.44346, 0.785398, 0.261799, 1.5708, 0.589049, 0.981748, 2.44346, 0.785398, 0.261799]

@@ -61,6 +61,11 @@ def generate_launch_description():
             default_value="true",
             description="Pass use_sim_time to ROS 2 nodes launched here.",
         ),
+        DeclareLaunchArgument(
+            "log_level",
+            default_value="info",
+            description="Log level for the locomotion controller (debug, info, warn, error).",
+        ),
     ]
 
     description_package = LaunchConfiguration("description_package")
@@ -69,6 +74,7 @@ def generate_launch_description():
     robot_name = LaunchConfiguration("robot_name")
     gz_args = LaunchConfiguration("gz_args")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    log_level = LaunchConfiguration("log_level")
 
     description_share = FindPackageShare(description_package)
 
@@ -177,7 +183,14 @@ def generate_launch_description():
     locomotion_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["locomotion_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "locomotion_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--ros-args",
+            "--log-level",
+            ["locomotion_controller:=", log_level],
+        ],
         parameters=[{"use_sim_time": use_sim_time}],
     )
 

@@ -14,8 +14,8 @@
 
 #include <gtest/gtest.h>
 
-#include <vector>
 #include <string>
+#include <vector>
 
 // Test helper functions for shape handling
 // These mirror the logic in LocomotionController for testing
@@ -43,7 +43,7 @@ std::vector<int64_t> resolve_dynamic_shape(
   const std::vector<int64_t> & model_shape, size_t actual_input_size)
 {
   std::vector<int64_t> resolved_shape = model_shape;
-  
+
   // Replace -1 (dynamic dimension) with actual size
   for (auto & dim : resolved_shape)
   {
@@ -52,7 +52,7 @@ std::vector<int64_t> resolve_dynamic_shape(
       dim = static_cast<int64_t>(actual_input_size);
     }
   }
-  
+
   return resolved_shape;
 }
 
@@ -76,19 +76,19 @@ TEST_F(TestOnnxShapeHandling, FormatShapeString)
 TEST_F(TestOnnxShapeHandling, ResolveDynamicShape)
 {
   size_t actual_size = 46;
-  
+
   // Static shape (no changes)
   auto result = resolve_dynamic_shape({46}, actual_size);
   EXPECT_EQ(result, std::vector<int64_t>({46}));
-  
+
   // Dynamic dimension
   result = resolve_dynamic_shape({-1}, actual_size);
   EXPECT_EQ(result, std::vector<int64_t>({46}));
-  
+
   // Multiple dimensions with dynamic
   result = resolve_dynamic_shape({1, -1}, actual_size);
   EXPECT_EQ(result, std::vector<int64_t>({1, 46}));
-  
+
   result = resolve_dynamic_shape({-1, 46}, actual_size);
   EXPECT_EQ(result, std::vector<int64_t>({46, 46}));
 }
@@ -96,7 +96,8 @@ TEST_F(TestOnnxShapeHandling, ResolveDynamicShape)
 // Test shape size calculation and dynamic dimension detection
 TEST_F(TestOnnxShapeHandling, CalculateModelInputSize)
 {
-  auto calculate_size = [](const std::vector<int64_t> & shape) {
+  auto calculate_size = [](const std::vector<int64_t> & shape)
+  {
     size_t model_input_size = 1;
     bool has_dynamic_dim = false;
     for (auto dim : shape)
@@ -112,15 +113,15 @@ TEST_F(TestOnnxShapeHandling, CalculateModelInputSize)
     }
     return std::make_pair(model_input_size, has_dynamic_dim);
   };
-  
+
   auto [size1, dynamic1] = calculate_size({1, 46});
   EXPECT_FALSE(dynamic1);
   EXPECT_EQ(size1, 46u);
-  
+
   auto [size2, dynamic2] = calculate_size({-1, 46});
   EXPECT_TRUE(dynamic2);
   EXPECT_EQ(size2, 46u);
-  
+
   auto [size3, dynamic3] = calculate_size({46});
   EXPECT_FALSE(dynamic3);
   EXPECT_EQ(size3, 46u);
@@ -130,19 +131,19 @@ TEST_F(TestOnnxShapeHandling, CalculateModelInputSize)
 TEST_F(TestOnnxShapeHandling, DimensionMatching)
 {
   size_t expected_input_size = 46;  // 10 + 3*12 joints
-  
+
   // Match case
   size_t model_input_size = 46;
   bool has_dynamic_dim = false;
   bool matches = (!has_dynamic_dim && model_input_size == expected_input_size);
   EXPECT_TRUE(matches);
-  
+
   // Mismatch case
   model_input_size = 48;
   has_dynamic_dim = false;
   matches = (!has_dynamic_dim && model_input_size == expected_input_size);
   EXPECT_FALSE(matches);
-  
+
   // Dynamic dimension skips validation
   has_dynamic_dim = true;
   bool should_validate = !has_dynamic_dim;
@@ -154,4 +155,3 @@ int main(int argc, char ** argv)
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

@@ -80,18 +80,6 @@ The observation vector is concatenated in the following order:
 
 Total dimension: ``10 + 3*N`` (where N = number of leg joints).
 
-Outputs:
-
-- Model inference returns relative joint positions (N joints, scaled by 0.25 per
-  ``env_cfg.py``)
-- ActionProcessor processes model outputs:
-
-  - Applies scale factor (0.25) to model outputs
-  - Adds default joint position offset (initialized from sensor data on first
-    update)
-  - Converts relative positions to absolute joint positions
-
-- Write absolute joint positions to hardware position command interfaces
 
 Gazebo Integration
 ~~~~~~~~~~~~~~~~~~
