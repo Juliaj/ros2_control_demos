@@ -70,6 +70,15 @@ private:
   void compute_projected_gravity(
     double qx, double qy, double qz, double qw, std::vector<double> & projected_gravity);
 
+  // Format joint positions relative to last time step
+  // Uses tracked previous_joint_positions_ for accurate relative calculation
+  void format_joint_positions_relative(
+    const std::vector<double> & joint_positions, std::vector<float> & observation);
+
+  // Format joint velocities relative to last time step
+  void format_joint_velocities_relative(
+    const std::vector<double> & joint_velocities, std::vector<float> & observation);
+
   std::vector<std::string> joint_names_;
   size_t num_joints_;
   size_t observation_dim_;  // 10 + 3*N (velocity_commands: 4, base_ang_vel: 3, projected_gravity:
@@ -84,6 +93,11 @@ private:
 
   // Names associated with incoming InterfacesValues message
   std::vector<std::string> interface_names_;
+
+  // Track previous joint positions and velocities for relative calculations
+  std::vector<double> previous_joint_positions_;
+  std::vector<double> previous_joint_velocities_;
+  bool previous_states_initialized_;
 };
 
 }  // namespace locomotion_controller

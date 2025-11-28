@@ -1,8 +1,11 @@
-# ONNX Runtime
+ONNX Runtime
+============
 
-## Introduction
+Introduction
+------------
 
-ONNX Runtime is a runtime for executing ONNX models. It is a cross-platform library that can be used to execute ONNX models on a variety of devices.
+ONNX Runtime executes ONNX models. It is a library that runs ONNX models on
+different platforms and devices.
 
 ONNX Runtime Tensor Handling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -37,8 +40,10 @@ steps:
    and returns output tensors.
 
 5. Tensor extraction: After inference, output tensors are accessed via:
+
    - ``GetTensorMutableData<float>()``: Returns a typed pointer (``float*``)
      to the underlying tensor data
+
    - ``GetTensorTypeAndShapeInfo().GetElementCount()``: Returns the total
      number of elements
 

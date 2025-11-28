@@ -13,18 +13,16 @@ Implementation Design
 Architecture
 ~~~~~~~~~~~~
 
-The implementation relies on three main components:
+The implementation relies on two main components:
 
-1. ``imu_sensor_broadcaster`` keeps the controller supplied with orientation,
-   angular velocity, and linear acceleration by publishing the
-   ``sensor_msgs/Imu`` topic straight from the IMU state interfaces.
-2. ``interfaces_state_broadcaster`` aggregates every hardware state interface
+1. ``interfaces_state_broadcaster`` aggregates every hardware state interface
    into the ``control_msgs/InterfacesValues`` topic so downstream consumers
-   receive a consistent snapshot.
-3. **LocomotionController** (a ros2_control controller plugin) is the heart of
-   the pipeline: it subscribes to the broadcaster topics, formats observations,
-   performs ONNX inference, and writes the resulting joint position targets back
-   to the hardware command interfaces.
+   receive a consistent snapshot, including IMU data (orientation, angular
+   velocity, linear acceleration) and joint states.
+2. LocomotionController (a ros2_control controller plugin) is the core component:
+   it subscribes to the broadcaster topic, formats observations, performs ONNX
+   inference, and writes the resulting joint position targets back to the hardware
+   command interfaces.
 
 Data Flow
 ~~~~~~~~~
@@ -33,7 +31,6 @@ Data Flow
 
    Hardware State Interfaces
        ↓ (read)
-   imu_sensor_broadcaster → sensor_msgs/Imu topic
    interfaces_state_broadcaster → control_msgs/InterfacesValues topic
        ↓ (subscribe)
    LocomotionController in controller_manager
@@ -47,12 +44,9 @@ Update Rate: 25 Hz (configured in controller YAML).
 
 Inputs:
 
-- Sensor data: subscribe to broadcaster topics
+- Sensor data: subscribe to ``interfaces_state_broadcaster/values`` topic
 
-  - ``imu_sensor_broadcaster/imu``: IMU data (orientation, angular velocity,
-    linear acceleration)
-  - ``interfaces_state_broadcaster/values``: all interface states
-
+  - All interface states including:
     - Base angular velocity (from IMU)
     - Projected gravity vector (from IMU orientation)
     - Joint positions and velocities
@@ -94,7 +88,7 @@ Gazebo Integration
 
 - Hardware interface exposes IMU state interfaces (orientation,
   ``angular_velocity``, ``linear_acceleration``) as defined in the ros2_control
-  xacro, allowing IMU sensor broadcasters to read sensor data
+  xacro, which are aggregated by interfaces_state_broadcaster
 - Store raw model outputs (not processed) as previous action for the next
   iteration
 
@@ -112,8 +106,8 @@ Hardware Layer
 Controller Manager
 ~~~~~~~~~~~~~~~~~~
 
-- Orchestrates the control loop at 25 Hz
-- Manages the lifecycle of all controllers (broadcasters and LocomotionController)
+- Runs the control loop at 25 Hz
+- Manages the lifecycle of all controllers (interfaces_state_broadcaster and LocomotionController)
 
 User Command Interface
 ~~~~~~~~~~~~~~~~~~~~~~

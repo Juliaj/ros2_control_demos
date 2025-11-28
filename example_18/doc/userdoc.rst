@@ -33,9 +33,10 @@ Troubleshooting ONNX Runtime installation
 If you encounter the following error:
 
 .. code-block:: bash
+
    # find where the library is extracted
    find ~ -name "onnxruntime-linux-x64-*" -type d 2>/dev/null
-   
+
    # copy to the right location
    sudo cp -r /pathto_extracted_library/onnxruntime-linux-x64-1.23.2/include/* /usr/local/include/
    sudo cp -r /pathto_extracted_library/onnxruntime-linux-x64-1.23.2/lib/* /usr/local/lib/
@@ -92,26 +93,26 @@ Run the demo
 
       # IMPORTANT: Send velocity commands to control robot movement
       # The robot will circle or not move if no commands are received
-      
+
       # Send a 0.5 m/s forward command (one-time)
       ros2 topic pub --once /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
         "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
-      
+
       # Send continuous forward command (press Ctrl+C to stop)
       ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
         "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
-      
+
       # Send turning command
       ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
         "{linear: {x: 0.3, y: 0.0}, angular: {z: 0.5}}"
-      
+
       # Check if commands are being received (should show non-zero values)
       ros2 topic echo /locomotion_controller/cmd_vel
 
       # Inspect state/broadcaster streams
       ros2 topic echo /interfaces_state_broadcaster/values --once
       ros2 topic echo /joint_states
-      
+
       # Verify controller is receiving commands (check logs for "received=yes")
       # If "received=no", check topic name matches controller subscription
 
@@ -167,55 +168,55 @@ Architecture
 
 
 
-## How We Determined the Observation Vector Dimension
+Observation Vector Dimension
+-----------------------------
 
-The dimensions are determined by the source code and also [IsaacLab MDP documentation](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html).
+The dimensions are determined by the source code and `IsaacLab MDP documentation <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html>`_.
 
+1. generated_commands (line 51-54):
+   - Output: 4D when heading_command=True
+   - From UniformVelocityCommandCfg: [lin_vel_x, lin_vel_y, ang_vel_z, heading]
+   - Without heading: 3D [lin_vel_x, lin_vel_y, ang_vel_z]
 
-1. `generated_commands` (line 51-54):
-   - Output: 4D when `heading_command=True`
-   - From `UniformVelocityCommandCfg`: `[lin_vel_x, lin_vel_y, ang_vel_z, heading]`
-   - Without heading: 3D `[lin_vel_x, lin_vel_y, ang_vel_z]`
+   .. code-block:: python
 
-```25:39:Berkeley-Humanoid-Lite/source/berkeley_humanoid_lite/berkeley_humanoid_lite/tasks/locomotion/velocity/config/biped/env_cfg.py
-base_velocity = mdp.UniformVelocityCommandCfg(
-    resampling_time_range=(10.0, 10.0),
-    debug_vis=True,
-    asset_name="robot",
-    heading_command=True,
-    heading_control_stiffness=0.5,
-    rel_standing_envs=0.02,
-    rel_heading_envs=1.0,
-    ranges=mdp.UniformVelocityCommandCfg.Ranges(
-        lin_vel_x=(-0.5, 0.5),
-        lin_vel_y=(-0.25, 0.25),
-        ang_vel_z=(-1.0, 1.0),
-        heading=(-math.pi, math.pi),
-    ),
-)
-```
+      base_velocity = mdp.UniformVelocityCommandCfg(
+          resampling_time_range=(10.0, 10.0),
+          debug_vis=True,
+          asset_name="robot",
+          heading_command=True,
+          heading_control_stiffness=0.5,
+          rel_standing_envs=0.02,
+          rel_heading_envs=1.0,
+          ranges=mdp.UniformVelocityCommandCfg.Ranges(
+              lin_vel_x=(-0.5, 0.5),
+              lin_vel_y=(-0.25, 0.25),
+              ang_vel_z=(-1.0, 1.0),
+              heading=(-math.pi, math.pi),
+          ),
+      )
 
-2. `base_ang_vel` (line 55-58):
+2. base_ang_vel (line 55-58):
    - Output: 3D
-   - [mdp.base_ang_vel](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.base_ang_vel) returns torch.Tensor with shape (3,)
-   - Returns base angular velocity in world frame: `[ang_vel_x, ang_vel_y, ang_vel_z]` (roll, pitch, yaw rates)
+   - `mdp.base_ang_vel <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.base_ang_vel>`_ returns torch.Tensor with shape (3,)
+   - Returns base angular velocity in world frame: [ang_vel_x, ang_vel_y, ang_vel_z] (roll, pitch, yaw rates)
 
-3. `projected_gravity` (line 59-62):
+3. projected_gravity (line 59-62):
    - Output: 3D
-   - [mdp.projected_gravity](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.projected_gravity) returns torch.Tensor with shape (3,)
-   - Returns gravity vector projected into body frame: `[g_x, g_y, g_z]`
+   - `mdp.projected_gravity <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.projected_gravity>`_ returns torch.Tensor with shape (3,)
+   - Returns gravity vector projected into body frame: [g_x, g_y, g_z]
 
-4. `joint_pos_rel` (line 63-67):
-   - output: N dimensions (one per joint in `HUMANOID_LITE_LEG_JOINTS`) 
-   - [mdp.joint_pos_rel](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.joint_pos_rel) returns torch.Tensor with shape (N,)
+4. joint_pos_rel (line 63-67):
+   - Output: N dimensions (one per joint in HUMANOID_LITE_LEG_JOINTS)
+   - `mdp.joint_pos_rel <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.joint_pos_rel>`_ returns torch.Tensor with shape (N,)
 
-5. `joint_vel_rel` (line 68-72):
-   - output: N dimensions (one per joint in `HUMANOID_LITE_LEG_JOINTS`)
-   - [mdp.joint_vel_rel](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.joint_vel_rel) returns torch.Tensor with shape (N,)
+5. joint_vel_rel (line 68-72):
+   - Output: N dimensions (one per joint in HUMANOID_LITE_LEG_JOINTS)
+   - `mdp.joint_vel_rel <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.joint_vel_rel>`_ returns torch.Tensor with shape (N,)
 
-6. `last_action` (line 73):
-   - output: N dimensions (one per joint in `HUMANOID_LITE_LEG_JOINTS`)
-   - [mdp.last_action](https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.last_action) returns torch.Tensor with shape (N,)
+6. last_action (line 73):
+   - Output: N dimensions (one per joint in HUMANOID_LITE_LEG_JOINTS)
+   - `mdp.last_action <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.last_action>`_ returns torch.Tensor with shape (N,)
 
 Your ROS2 implementation matches these dimensions: 4 + 3 + 3 + N + N + N = 10 + 3N.
 
@@ -264,11 +265,11 @@ Action Quality Metrics
 
 The controller reports action quality statistics every 100 updates (~4 seconds at 25Hz):
 
-- **Clamping rate**: Percentage of commands that exceed joint limits
-- **Action smoothness**: Average change per step (rad/step)
-- **Extreme actions**: Percentage of actions beyond ±3.0 rad
-- **Most clamped joints**: Joints that frequently exceed limits
-- **Action ranges**: Min/max values observed for each joint
+- Clamping rate: Percentage of commands that exceed joint limits
+- Action smoothness: Average change per step (rad/step)
+- Extreme actions: Percentage of actions beyond ±3.0 rad
+- Most clamped joints: Joints that frequently exceed limits
+- Action ranges: Min/max values observed for each joint
 
 Warning thresholds:
 - Clamping rate > 20%: Actions frequently exceed limits
@@ -278,7 +279,7 @@ Warning thresholds:
 Common Issues and Solutions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **High Clamping Rate (>60%)**
+1. High Clamping Rate (>60%)
 
    Symptoms:
    - Most joints clamped every update
@@ -286,34 +287,34 @@ Common Issues and Solutions
    - Robot unable to execute desired motions
 
    Diagnostic steps:
-   
+
    a. Check raw model outputs (enable debug logging):
-   
+
       .. code-block:: bash
-      
+
          ros2 launch ros2_control_demo_example_18 example_18_gazebo.launch.py log_level:=debug
-      
+
       Look for "Raw model outputs (before scaling)" in logs. Expected range: typically [-1, 1] or [-4, 4].
       If outputs are >10, the model may be producing wrong values.
 
    b. Verify action scale:
-   
+
       Check ``action_scale`` in ``biped_robot_controllers.yaml`` (default: 0.25).
       If raw outputs are large, try reducing scale:
-      
+
       .. code-block:: yaml
-      
+
          action_scale: 0.1  # Try 0.1 instead of 0.25
 
    c. Enable default joint positions:
-   
+
       Uncomment and verify in config:
-      
+
       .. code-block:: yaml
-      
+
          default_joint_positions: [0.0, 0.0, -0.2, 0.4, -0.3, 0.0, 0.0, 0.0, -0.2, 0.4, -0.3, 0.0]
 
-2. **High Action Change Rate (>0.5 rad/step)**
+2. High Action Change Rate (>0.5 rad/step)
 
    Symptoms:
    - Actions jumping erratically between updates
@@ -321,7 +322,7 @@ Common Issues and Solutions
    - High "Action smoothness" values in quality report
 
    Solutions:
-   
+
    a. Verify observation space matches training:
       - Check if sensor data (IMU, joint states) are in correct units/ranges
       - Verify observation normalization matches training configuration
@@ -332,7 +333,7 @@ Common Issues and Solutions
       - Compare with Berkeley-Humanoid-Lite training configs
       - Ensure model was trained with same action scaling
 
-3. **Extreme Actions (>3.0 rad)**
+3. Extreme Actions (>3.0 rad)
 
    Symptoms:
    - Actions beyond reasonable joint ranges
@@ -340,7 +341,7 @@ Common Issues and Solutions
    - High extreme action rate in quality report
 
    Solutions:
-   
+
    a. Check observation formatter:
       - Verify observation dimensions match model input
       - Ensure sensor data is properly normalized
@@ -349,16 +350,16 @@ Common Issues and Solutions
    b. Verify model inputs:
       - Check "Observation size mismatch" errors in logs
       - Verify all sensor data is being received
-      - Ensure previous_action_ is properly initialized
+      - Ensure ``previous_action_`` is properly initialized
 
-4. **Specific Joint Issues**
+4. Specific Joint Issues
 
    If specific joints are always clamped (e.g., all ankle joints):
-   
+
    a. Check joint limits:
       - Verify limits in ``biped_robot_controllers.yaml`` match ros2_control config
       - Check for Gazebo limit enforcement issues (see below)
-   
+
    b. Check action ranges:
       - Review "Action ranges" in quality report
       - Compare with expected joint ranges from training
@@ -398,26 +399,26 @@ Causes:
 Solutions:
 
 a. Verify default joint positions initialization:
-   
+
    Check logs for:
-   
+
    .. code-block:: bash
-   
+
       "Using default joint positions from parameters"  # Good
       "will initialize from sensor data"  # May cause issues
-   
+
    If using sensor initialization, ensure positions are stable before first command.
    Consider explicitly setting default_joint_positions in config.
 
 b. Check for observation inconsistencies:
-   
+
    - Verify IMU data is stable and properly scaled
    - Check joint state data is consistent
    - Ensure observation formatter is using correct reference frames
-   - Verify previous_action is properly maintained
+   - Verify ``previous_action_`` is properly maintained
 
 c. Consider action smoothing (if needed):
-   
+
    Add low-pass filtering or rate limiting to smooth actions:
    - Limit max change per step (e.g., 0.5 rad/step)
    - Apply exponential smoothing to actions

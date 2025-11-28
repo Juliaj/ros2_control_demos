@@ -495,6 +495,40 @@ return_type LocomotionController::update(
     {
       double change = std::abs(joint_commands[i] - previous_joint_commands_[i]);
       total_change += change;
+
+      // Flag large action changes (>0.3 rad in one step) - potential cause of instability
+      if (change > 0.3)
+      {
+        RCLCPP_WARN_THROTTLE(
+          get_node()->get_logger(), *get_node()->get_clock(), 500,
+          "LARGE ACTION CHANGE: Joint '%s' changed by %.4f rad (from %.4f to %.4f) - "
+          "may cause instability!",
+          joint_names_[i].c_str(), change, previous_joint_commands_[i], joint_commands[i]);
+      }
+    }
+
+    // Check if hip/ankle joints exceed 50% of limit range (critical for stability)
+    const std::string & joint_name = joint_names_[i];
+    bool is_hip_or_ankle = (joint_name.find("hip") != std::string::npos) ||
+                           (joint_name.find("ankle") != std::string::npos);
+    if (is_hip_or_ankle)
+    {
+      double limit_range = joint_position_limits_max_[i] - joint_position_limits_min_[i];
+      if (limit_range > 1e-6)  // Avoid division by zero
+      {
+        double position_in_range =
+          (joint_commands[i] - joint_position_limits_min_[i]) / limit_range;
+        // Flag if command is beyond 50% of range (either >75% or <25%)
+        if (position_in_range > 0.75 || position_in_range < 0.25)
+        {
+          RCLCPP_WARN_THROTTLE(
+            get_node()->get_logger(), *get_node()->get_clock(), 500,
+            "HIP/ANKLE NEAR LIMIT: Joint '%s' at %.4f (%.1f%% of range [%.4f, %.4f]) - "
+            "may cause instability!",
+            joint_names_[i].c_str(), joint_commands[i], position_in_range * 100.0,
+            joint_position_limits_min_[i], joint_position_limits_max_[i]);
+        }
+      }
     }
 
     // Clamp command to joint limits

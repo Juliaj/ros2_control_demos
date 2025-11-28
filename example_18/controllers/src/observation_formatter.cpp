@@ -29,7 +29,10 @@ ObservationFormatter::ObservationFormatter(
   num_joints_(joint_names.size()),
   default_joint_positions_(num_joints_, 0.0),
   default_joint_positions_set_(false),
-  imu_sensor_name_(imu_sensor_name)
+  imu_sensor_name_(imu_sensor_name),
+  previous_joint_positions_(num_joints_, 0.0),
+  previous_joint_velocities_(num_joints_, 0.0),
+  previous_states_initialized_(false)
 {
   // Observation dimension: 4 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity)
   // + N (joint_pos) + N (joint_vel) + N (actions) = 10 + 3*N
@@ -87,35 +90,11 @@ std::vector<float> ObservationFormatter::format(
     observation.push_back(static_cast<float>(val));
   }
 
-  // 4. Joint positions (N joints, relative to default positions)
-  // Basis: Berkeley-Humanoid-Lite uses joint_pos_rel (from IsaacLab MDP) which computes
-  // relative positions (joint_pos - default_joint_pos) for better generalization and
-  // pose-invariant observations
-  if (default_joint_positions_set_ && joint_positions.size() == default_joint_positions_.size())
-  {
-    for (size_t i = 0; i < joint_positions.size(); ++i)
-    {
-      observation.push_back(static_cast<float>(joint_positions[i] - default_joint_positions_[i]));
-    }
-  }
-  else
-  {
-    // Fallback to absolute if defaults not set
-    for (const auto & val : joint_positions)
-    {
-      observation.push_back(static_cast<float>(val));
-    }
-  }
+  // 4. Joint positions (relative to last time step)
+  format_joint_positions_relative(joint_positions, observation);
 
-  // 5. Joint velocities (N joints, relative)
-  // Basis: Berkeley-Humanoid-Lite uses joint_vel_rel (from IsaacLab MDP)
-  // Using raw joint velocities from sensors, which should match the expected format
-  // TODO: Verify what "relative" means in joint_vel_rel - check IsaacLab documentation
-  // to ensure we're computing velocities correctly (e.g., relative to what reference?)
-  for (const auto & val : joint_velocities)
-  {
-    observation.push_back(static_cast<float>(val));
-  }
+  // 5. Joint velocities (relative to last time step)
+  format_joint_velocities_relative(joint_velocities, observation);
 
   // 6. Previous action (N joints)
   if (previous_action.size() != num_joints_)
@@ -361,6 +340,64 @@ void ObservationFormatter::compute_projected_gravity(
   projected_gravity[0] = r02;  // R^T[0,2] = R[2,0]
   projected_gravity[1] = r12;  // R^T[1,2] = R[2,1]
   projected_gravity[2] = r22;  // R^T[2,2] = R[2,2]
+}
+
+void ObservationFormatter::format_joint_positions_relative(
+  const std::vector<double> & joint_positions, std::vector<float> & observation)
+{
+  // Validate input sizes
+  if (joint_positions.size() != num_joints_)
+  {
+    throw std::runtime_error(
+      "Joint positions size mismatch in format_joint_positions_relative: positions=" +
+      std::to_string(joint_positions.size()) + ", expected=" + std::to_string(num_joints_));
+  }
+
+  // Use previous joint positions from state interfaces (most accurate)
+  // TODO(juliaj): Check whether this is valid when CM update frequency on state interfaces is
+  // higher than the controller update frequency. If not initialized yet, use current positions as
+  // baseline (relative will be zero)
+  std::vector<double> previous_absolute_positions = previous_joint_positions_;
+
+  // Joint positions (N joints, relative to last time step)
+  // Compute: current_position - previous_absolute_position
+  for (size_t i = 0; i < num_joints_; ++i)
+  {
+    double relative_position = joint_positions[i] - previous_absolute_positions[i];
+    observation.push_back(static_cast<float>(relative_position));
+  }
+
+  // Update previous joint positions for next iteration
+  previous_joint_positions_ = joint_positions;
+}
+
+void ObservationFormatter::format_joint_velocities_relative(
+  const std::vector<double> & joint_velocities, std::vector<float> & observation)
+{
+  // Validate input size
+  if (joint_velocities.size() != num_joints_)
+  {
+    throw std::runtime_error(
+      "Joint velocities size mismatch in format_joint_velocities_relative: velocities=" +
+      std::to_string(joint_velocities.size()) + ", expected=" + std::to_string(num_joints_));
+  }
+
+  // Use previous joint velocities from state interfaces (most accurate)
+  // TODO(juliaj): Check whether this is valid when CM update frequency on state interfaces is
+  // higher than the controller update frequency.
+  std::vector<double> previous_velocities = previous_joint_velocities_;
+
+  // Joint velocities (N joints, relative to last time step)
+  // Compute: current_velocity - previous_velocity
+  for (size_t i = 0; i < num_joints_; ++i)
+  {
+    double relative_velocity = joint_velocities[i] - previous_velocities[i];
+    observation.push_back(static_cast<float>(relative_velocity));
+  }
+
+  // Update previous joint velocities for next iteration
+  previous_joint_velocities_ = joint_velocities;
+  previous_states_initialized_ = true;
 }
 
 }  // namespace locomotion_controller

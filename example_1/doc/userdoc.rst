@@ -501,3 +501,45 @@ Controllers from this demo
   * ``Joint State Broadcaster`` (`ros2_controllers repository <https://github.com/ros-controls/ros2_controllers/tree/{REPOS_FILE_BRANCH}/joint_state_broadcaster>`__): :ref:`doc <joint_state_broadcaster_userdoc>`
   * ``Forward Command Controller`` (`ros2_controllers repository <https://github.com/ros-controls/ros2_controllers/tree/{REPOS_FILE_BRANCH}/forward_command_controller>`__): :ref:`doc <forward_command_controller_userdoc>`
   * ``Joint Trajectory Controller`` (`ros2_controllers repository <https://github.com/ros-controls/ros2_controllers/tree/{REPOS_FILE_BRANCH}/joint_trajectory_controller>`__): :ref:`doc <joint_trajectory_controller_userdoc>`
+
+Troubleshooting: Robot Instability from Action Commands
+--------------------------------------------------------
+
+When a robot falls immediately after receiving commands, analyze controller logs for action quality issues.
+
+Summary from logs:
+
+1. Primary issue: leg_left_hip_roll_joint
+   - Frequently clamped (31x) - trying to go below -0.1745 rad
+   - Consistently near lower limit (10-40% of range)
+   - Gazebo enforces -0.15 rad (stricter than configured -0.1745)
+   - Root cause: model commands exceed hardware limits
+
+2. Large action changes (instability triggers)
+   - leg_left_knee_pitch: 0.41-0.77 rad/step (most severe)
+   - leg_left_ankle_pitch: 0.36-0.56 rad/step
+   - leg_left_hip_pitch: 0.31-0.45 rad/step
+   - Pattern: left leg joints show sudden jumps
+
+3. Limit mismatch
+   - Gazebo rejects commands even after clamping
+   - Example: leg_left_hip_roll limited to -0.15 in Gazebo vs -0.1745 in code
+   - Suggests limit configuration mismatch
+
+4. Action quality metrics
+   - Avg change: 0.13 rad/step (high)
+   - Most clamped: left leg joints (hip_roll, ankle_roll, knee_pitch)
+   - Action ranges show left leg at extremes
+
+Example log entries:
+
+.. code-block:: shell
+
+  [WARN] LARGE ACTION CHANGE: Joint 'leg_left_knee_pitch_joint' changed by 0.4137 rad (from 0.4000 to 0.8137) - may cause instability!
+  [WARN] HIP/ANKLE NEAR LIMIT: Joint 'leg_left_hip_roll_joint' at -0.8707 (-39.9% of range [-0.1745, 1.5708]) - may cause instability!
+  [WARN] Joint 'leg_left_hip_roll_joint' command clamped from -0.772397 to -0.174533 (limits: [-0.174533, 1.570800])
+  [ERROR] Command of at least one joint is out of limits. Joint: 'leg_left_hip_roll_joint', command: -0.174533, limited: -0.150000
+
+Root cause: The model produces large, sudden changes for left leg joints, especially leg_left_hip_roll_joint, pushing it beyond hardware limits and causing instability. The left leg is the primary failure point.
+
+Next step for investigation: Verify joint limit configuration matches between URDF/ros2_control config and Gazebo plugin. Check if gz_ros_control plugin is applying different limits than configured, and align the controller's joint_position_limits with actual hardware-enforced limits. Consider querying limits from command interfaces at runtime instead of hardcoded values.
