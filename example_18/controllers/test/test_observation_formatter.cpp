@@ -123,12 +123,23 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
   control_msgs::msg::InterfacesValues interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
 
-  // Populate values to match interface ordering (position first, velocity second per joint)
-  interface_data.values.resize(interface_names_.size(), 0.0);
+  // Interface data format: 10 IMU values + 2*num_joints_ (position + velocity per joint)
+  // Indices: 0-3 (IMU orientation), 4-6 (IMU ang vel), 7-9 (IMU lin acc - unused),
+  //          10-10+num_joints_-1 (joint positions), 10+num_joints_-10+2*num_joints_-1 (joint
+  //          velocities)
+  const size_t expected_size = 10 + 2 * num_joints_;
+  interface_data.values.resize(expected_size, 0.0);
+
+  // Set IMU orientation (required for extraction to work properly)
+  interface_data.values[0] = 0.0;  // orientation x
+  interface_data.values[1] = 0.0;  // orientation y
+  interface_data.values[2] = 0.0;  // orientation z
+  interface_data.values[3] = 1.0;  // orientation w
+
+  // Set joint positions at correct indices (starting at 10)
   for (size_t i = 0; i < num_joints_; ++i)
   {
-    const size_t pos_idx = i * 2;
-    interface_data.values[pos_idx] = 1.0;  // Absolute position
+    interface_data.values[10 + i] = 1.0;  // Absolute position
   }
 
   // Set default positions to 0.5

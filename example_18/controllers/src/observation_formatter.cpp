@@ -29,6 +29,8 @@ ObservationFormatter::ObservationFormatter(
   num_joints_(joint_names.size()),
   default_joint_positions_(num_joints_, 0.0),
   default_joint_positions_set_(false),
+  default_joint_velocities_(num_joints_, 0.0),
+  default_joint_velocities_set_(false),
   imu_sensor_name_(imu_sensor_name),
   previous_joint_positions_(num_joints_, 0.0),
   previous_joint_velocities_(num_joints_, 0.0),
@@ -90,10 +92,10 @@ std::vector<float> ObservationFormatter::format(
     observation.push_back(static_cast<float>(val));
   }
 
-  // 4. Joint positions (relative to last time step)
+  // 4. Joint positions (relative to default positions)
   format_joint_positions_relative(joint_positions, observation);
 
-  // 5. Joint velocities (relative to last time step)
+  // 5. Joint velocities (absolute velocities)
   format_joint_velocities_relative(joint_velocities, observation);
 
   // 6. Previous action (N joints)
@@ -139,6 +141,20 @@ std::vector<double> ObservationFormatter::extract_joint_positions(
   return joint_positions;
 }
 
+std::vector<double> ObservationFormatter::extract_joint_velocities(
+  const control_msgs::msg::InterfacesValues & interface_data)
+{
+  std::vector<double> base_angular_velocity;
+  std::vector<double> projected_gravity;
+  std::vector<double> joint_positions;
+  std::vector<double> joint_velocities;
+
+  extract_interface_data(
+    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+
+  return joint_velocities;
+}
+
 void ObservationFormatter::set_default_joint_positions(
   const std::vector<double> & default_positions)
 {
@@ -146,6 +162,16 @@ void ObservationFormatter::set_default_joint_positions(
   {
     default_joint_positions_ = default_positions;
     default_joint_positions_set_ = true;
+  }
+}
+
+void ObservationFormatter::set_default_joint_velocities(
+  const std::vector<double> & default_velocities)
+{
+  if (default_velocities.size() == num_joints_)
+  {
+    default_joint_velocities_ = default_velocities;
+    default_joint_velocities_set_ = true;
   }
 }
 
@@ -353,22 +379,15 @@ void ObservationFormatter::format_joint_positions_relative(
       std::to_string(joint_positions.size()) + ", expected=" + std::to_string(num_joints_));
   }
 
-  // Use previous joint positions from state interfaces (most accurate)
-  // TODO(juliaj): Check whether this is valid when CM update frequency on state interfaces is
-  // higher than the controller update frequency. If not initialized yet, use current positions as
-  // baseline (relative will be zero)
-  std::vector<double> previous_absolute_positions = previous_joint_positions_;
-
-  // Joint positions (N joints, relative to last time step)
-  // Compute: current_position - previous_absolute_position
+  // Joint positions (N joints, relative to default positions)
+  // Compute: current_position - default_position
+  // Reference:
+  // https://github.com/isaac-sim/IsaacLab/blob/18c7c58d7a6758b6119401945b881e21c8ec0392/source/isaaclab/isaaclab/envs/mdp/observations.py#L209
   for (size_t i = 0; i < num_joints_; ++i)
   {
-    double relative_position = joint_positions[i] - previous_absolute_positions[i];
+    double relative_position = joint_positions[i] - default_joint_positions_[i];
     observation.push_back(static_cast<float>(relative_position));
   }
-
-  // Update previous joint positions for next iteration
-  previous_joint_positions_ = joint_positions;
 }
 
 void ObservationFormatter::format_joint_velocities_relative(
@@ -382,22 +401,13 @@ void ObservationFormatter::format_joint_velocities_relative(
       std::to_string(joint_velocities.size()) + ", expected=" + std::to_string(num_joints_));
   }
 
-  // Use previous joint velocities from state interfaces (most accurate)
-  // TODO(juliaj): Check whether this is valid when CM update frequency on state interfaces is
-  // higher than the controller update frequency.
-  std::vector<double> previous_velocities = previous_joint_velocities_;
-
-  // Joint velocities (N joints, relative to last time step)
-  // Compute: current_velocity - previous_velocity
+  // Joint velocities (N joints, absolute velocities)
+  // Reference:
+  // https://github.com/isaac-sim/IsaacLab/blob/18c7c58d7a6758b6119401945b881e21c8ec0392/source/isaaclab/isaaclab/envs/mdp/observations.py#L254
   for (size_t i = 0; i < num_joints_; ++i)
   {
-    double relative_velocity = joint_velocities[i] - previous_velocities[i];
-    observation.push_back(static_cast<float>(relative_velocity));
+    observation.push_back(static_cast<float>(joint_velocities[i]));
   }
-
-  // Update previous joint velocities for next iteration
-  previous_joint_velocities_ = joint_velocities;
-  previous_states_initialized_ = true;
 }
 
 }  // namespace locomotion_controller

@@ -94,17 +94,19 @@ Run the demo
       # IMPORTANT: Send velocity commands to control robot movement
       # The robot will circle or not move if no commands are received
 
-      # Send a 0.5 m/s forward command (one-time)
+      # Sanity check: Send a single command to verify the controller is receiving messages
+      # Format: [lin_vel_x, lin_vel_y, ang_vel_z] (heading defaults to 0.0)
+      # Example from policy_biped_25hz_b.yaml config
+      # Note: This is for testing only - the command is used once, then controller falls back to default pose
       ros2 topic pub --once /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
-        "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
+        "{linear: {x: -0.2760711908340454, y: 0.19024816155433655}, angular: {z: -0.6159124374389648}}"
 
-      # Send continuous forward command (press Ctrl+C to stop)
-      ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
-        "{linear: {x: 0.5, y: 0.0}, angular: {z: 0.0}}"
-
-      # Send turning command
-      ros2 topic pub /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
-        "{linear: {x: 0.3, y: 0.0}, angular: {z: 0.5}}"
+      # RECOMMENDED: Send continuous commands for actual locomotion control
+      # The controller uses the latest received command each update cycle (25 Hz)
+      # If no new command arrives, it falls back to default joint positions (stable pose)
+      # Publish at 10 Hz or higher for smooth control
+      ros2 topic pub -r 10 /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
+        "{linear: {x: -0.2760711908340454, y: 0.19024816155433655}, angular: {z: -0.6159124374389648}}"
 
       # Check if commands are being received (should show non-zero values)
       ros2 topic echo /locomotion_controller/cmd_vel
@@ -115,6 +117,34 @@ Run the demo
 
       # Verify controller is receiving commands (check logs for "received=yes")
       # If "received=no", check topic name matches controller subscription
+
+Velocity Command Behavior
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The controller behavior is based on the implementation in ``locomotion_controller.cpp`` (lines 315-345):
+
+- Uses ``realtime_tools::RealtimeThreadSafeBox::try_get()`` to get velocity commands
+- ``try_get()`` only returns a value if a new message arrived since the last call
+- If no new command arrives in an update cycle, ``velocity_cmd_received = false``
+- This triggers ``is_zero_command = true`` (line 333-336)
+- Default joint positions are used to maintain stable pose (line 388)
+
+For single commands (--once) - sanity check only:
+- The command is received and used for one update cycle (~0.04 seconds at 25 Hz)
+- On subsequent cycles, ``try_get()`` returns no value (no new message)
+- Controller falls back to default pose
+- Use only for testing/verification that the controller is receiving commands
+- Not suitable for actual locomotion control
+
+For continuous commands (-r rate) - recommended for operation:
+- New messages arrive each cycle, so ``try_get()`` returns the latest value
+- Controller uses the latest command each update cycle
+- Required for locomotion control
+- Publish at 10 Hz or higher to ensure smooth control
+- This is the standard way to control the robot during operation
+
+Note: The controller does not maintain the last received command - it only uses commands that arrive in the current update cycle. This is by design of the real-time safe buffer.
+
 
 Expected behaviour: the robot spawns balanced, follows velocity commands, and logs
 warnings if the observation vector dimension deviates from ``10 + 3*N`` (``N=12``).
@@ -130,11 +160,8 @@ Unit tests
    cd ~/ros2_control_ws
    colcon build --packages-select ros2_control_demo_example_18 --cmake-args -DBUILD_TESTING=ON
    source install/setup.bash
-   ros2 run ros2_control_demo_example_18 test_observation_formatter
-   ros2 run ros2_control_demo_example_18 test_action_processor
+   colcon test --packages-select ros2_control_demo_example_18 --event-handlers console_direct+
 
-- Observation formatter tests cover ordering, relative joint math, and dimension checks.
-- Action processor tests confirm scale (0.25), offsets, and negative-value handling.
 
 End-to-end validation
 ~~~~~~~~~~~~~~~~~~~~~
@@ -152,21 +179,22 @@ Architecture
 .. code-block:: text
 
    [Gazebo Simulator]
-       ↓ (joint states)
+       ↓ (joint states, IMU data)
    [Hardware Interface]
        ↓ (state interfaces)
    [Interfaces State Broadcaster]
        ↓ (ROS2 topic: /interfaces_state_broadcaster/values)
-   [ONNX Humanoid Controller]
+   [Locomotion Controller]
+       ↑ (ROS2 topic: /locomotion_controller/cmd_vel - velocity commands)
        ↓ (ONNX inference)
-       ↓ (ROS2 topic: /forward_position_controller/commands)
-   [Forward Position Controller]
-       ↓ (command interfaces)
+       ↓ (command interfaces - joint position commands)
    [Hardware Interface]
        ↓ (joint commands)
    [Gazebo Simulator]
 
-
+.. image:: biped_robot.png
+   :align: center
+   :alt: Berkeley Humanoid Lite Biped Robot in RViz
 
 Observation Vector Dimension
 -----------------------------
@@ -279,6 +307,9 @@ Warning thresholds:
 Common Issues and Solutions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. note::
+   Work in Progress: This documentation is still under development. The robot currently falls down immediately after receiving a command. This issue is being actively investigated and resolved.
+
 1. High Clamping Rate (>60%)
 
    Symptoms:
@@ -358,102 +389,9 @@ Common Issues and Solutions
 
    a. Check joint limits:
       - Verify limits in ``biped_robot_controllers.yaml`` match ros2_control config
-      - Check for Gazebo limit enforcement issues (see below)
+      - Check for Gazebo limit enforcement issues (see below) -- this hasn't been observed in this demo at later stage
 
    b. Check action ranges:
       - Review "Action ranges" in quality report
       - Compare with expected joint ranges from training
       - Verify if model outputs are reasonable for that joint
-
-Gazebo Limit Enforcement Issues
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you see errors like "Command out of limits" with "limited: 0.150000" for hip_roll joints:
-
-- Gazebo's gz_ros_control plugin may misinterpret URDF ``velocity="15"`` as position limit 0.15
-- This is a known issue where Gazebo enforces different limits than ros2_control config
-- The controller uses correct limits ([-0.174533, 1.5708] for hip_roll), but Gazebo rejects commands >0.15
-
-Workarounds:
-- Use conservative limits in controller config that match Gazebo's enforcement
-- Investigate gz_ros_control plugin configuration
-- Check URDF velocity limits aren't being misinterpreted
-
-Action Oscillation Issues
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If action change rate is high (>0.5 rad/step) but actions look reasonable:
-
-Symptoms:
-- Actions oscillating between two states
-- High "Action smoothness" values (e.g., 9.78 rad/step)
-- Robot movements jerky or unstable
-- Actions jumping between values (e.g., hip_roll: -0.13 ↔ 0.32)
-
-Causes:
-- Default joint positions not properly initialized
-- Observation space mismatch causing model instability
-- Model receiving inconsistent sensor data
-- Action smoothing/filtering needed
-
-Solutions:
-
-a. Verify default joint positions initialization:
-
-   Check logs for:
-
-   .. code-block:: bash
-
-      "Using default joint positions from parameters"  # Good
-      "will initialize from sensor data"  # May cause issues
-
-   If using sensor initialization, ensure positions are stable before first command.
-   Consider explicitly setting default_joint_positions in config.
-
-b. Check for observation inconsistencies:
-
-   - Verify IMU data is stable and properly scaled
-   - Check joint state data is consistent
-   - Ensure observation formatter is using correct reference frames
-   - Verify ``previous_action_`` is properly maintained
-
-c. Consider action smoothing (if needed):
-
-   Add low-pass filtering or rate limiting to smooth actions:
-   - Limit max change per step (e.g., 0.5 rad/step)
-   - Apply exponential smoothing to actions
-   - Filter high-frequency oscillations
-
-Gazebo Dynamic Limit Issues
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you see "limited" values that change based on current position:
-
-Example:
-- Command: 0.325634, limited to: 0.091136 (current pos: 0.048465)
-- Command: -0.130383, limited to: -0.058864 (current pos: -0.000000)
-
-This indicates Gazebo is enforcing velocity-based safety limits or position-dependent constraints.
-
-Solutions:
-- These are safety limits and may be intentional
-- Commands within these limits should work
-- If problematic, investigate Gazebo plugin configuration
-- Consider using more conservative controller limits that account for these constraints
-
-Troubleshooting Checklist
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-1. Enable debug logging and check raw model outputs
-2. Verify action_scale parameter (try reducing if outputs are large)
-3. Enable and verify default_joint_positions
-4. Check observation space matches training configuration
-5. Verify model compatibility with training setup
-6. Review action quality reports for patterns
-7. Check for specific joint limit issues
-8. Verify sensor data (IMU, joints) are correct
-9. Compare action ranges with expected values from training
-10. Check for observation dimension mismatches
-11. Investigate action oscillation patterns
-12. Verify default joint positions are stable
-13. Check for Gazebo dynamic limit constraints

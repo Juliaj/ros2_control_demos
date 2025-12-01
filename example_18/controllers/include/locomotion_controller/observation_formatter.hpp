@@ -37,7 +37,7 @@ public:
   // 2. Base angular velocity (3D vector from IMU)
   // 3. Projected gravity vector (3D vector from IMU orientation)
   // 4. Joint positions (N joints, relative to default positions)
-  // 5. Joint velocities (N joints, relative)
+  // 5. Joint velocities (N joints, absolute)
   // 6. Previous action (N joints)
   std::vector<float> format(
     const control_msgs::msg::InterfacesValues & interface_data,
@@ -49,8 +49,15 @@ public:
   std::vector<double> extract_joint_positions(
     const control_msgs::msg::InterfacesValues & interface_data);
 
+  // Extract joint velocities from interface data (for initializing default velocities)
+  std::vector<double> extract_joint_velocities(
+    const control_msgs::msg::InterfacesValues & interface_data);
+
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
+
+  // Set default joint velocities (placeholder for future use)
+  void set_default_joint_velocities(const std::vector<double> & default_velocities);
 
   // Define mapping between interface indices and names published by interfaces_state_broadcaster
   void set_interface_names(const std::vector<std::string> & interface_names);
@@ -70,12 +77,12 @@ private:
   void compute_projected_gravity(
     double qx, double qy, double qz, double qw, std::vector<double> & projected_gravity);
 
-  // Format joint positions relative to last time step
-  // Uses tracked previous_joint_positions_ for accurate relative calculation
+  // Format joint positions relative to default positions
+  // Computes: current_position - default_position
   void format_joint_positions_relative(
     const std::vector<double> & joint_positions, std::vector<float> & observation);
 
-  // Format joint velocities relative to last time step
+  // Format joint velocities (absolute velocities)
   void format_joint_velocities_relative(
     const std::vector<double> & joint_velocities, std::vector<float> & observation);
 
@@ -87,6 +94,10 @@ private:
   // Default joint positions for relative position calculation
   std::vector<double> default_joint_positions_;
   bool default_joint_positions_set_;
+
+  // Default joint velocities (placeholder for future use)
+  std::vector<double> default_joint_velocities_;
+  bool default_joint_velocities_set_;
 
   // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
