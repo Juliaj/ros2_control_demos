@@ -1,0 +1,98 @@
+motion_controller:
+  # Core controller parameters
+  joints: {
+    type: string_array,
+    description: "Names of the joints to control",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+  model_path: {
+    type: string,
+    description: "Path to the ML model file (e.g., ONNX model)",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+
+  # ROS2 topic configuration
+  interfaces_broadcaster_topic: {
+    type: string,
+    default_value: "interfaces_state_broadcaster/values",
+    description: "Topic name from interfaces_state_broadcaster"
+  }
+  velocity_command_topic: {
+    type: string,
+    default_value: "~/cmd_head_velocity",
+    description: "Topic name for velocity commands (example_18_motion_controller_msgs/VelocityCommandWithHead). Contains base_velocity (geometry_msgs/Twist) and head_commands (float64[4] for neck_pitch, head_pitch, head_yaw, head_roll in radians)"
+  }
+  feet_contact_topic: {
+    type: string,
+    default_value: "~/feet_contacts",
+    description: "Topic name for feet contact sensor data (2D: left, right)"
+  }
+
+  # Action processing parameters
+  # Source: v2_rl_walk_mujoco.py:32
+  action_scale: {
+    type: double,
+    default_value: 0.25,
+    description: "Scale factor for model outputs. Source: v2_rl_walk_mujoco.py line 32"
+  }
+  # Source: v2_rl_walk_mujoco.py:88-91, 161
+  default_joint_positions: {
+    type: double_array,
+    default_value: [],
+    description: "Default joint positions (init_pos) for relative position calculation. If empty, initialized from sensor data. Source: v2_rl_walk_mujoco.py lines 88-91, 161"
+  }
+  # Source: v2_rl_walk_mujoco.py:310-311
+  head_joint_indices: {
+    type: int_array,
+    default_value: [5, 6, 7, 8],
+    description: "Indices of head joints receiving additional head commands. Source: v2_rl_walk_mujoco.py lines 310-311 (motor_targets[5:9])"
+  }
+
+  # IMU sensor configuration
+  imu_sensor_name: {
+    type: string,
+    default_value: "imu_2",
+    description: "Name of the IMU sensor for gyro and accelerometer data"
+  }
+  # Source: example_config.json:3
+  imu_upside_down: {
+    type: bool,
+    default_value: false,
+    description: "Whether the IMU sensor is mounted upside down. Source: example_config.json line 3"
+  }
+
+  # Control state parameters
+  # Source: example_config.json:2, v2_rl_walk_mujoco.py:95-96, 242-247
+  start_paused: {
+    type: bool,
+    default_value: false,
+    description: "Start controller in paused state (robot will not move until unpaused). Source: example_config.json line 2, v2_rl_walk_mujoco.py lines 95-96, 242-247"
+  }
+
+  # Gait phase parameters
+  # Source: example_config.json:4, v2_rl_walk_mujoco.py:107-108, 214-223, 257-258
+  phase_frequency_factor_offset: {
+    type: double,
+    default_value: 0.0,
+    description: "Offset to gait phase frequency factor (affects walking speed). Source: example_config.json line 4, v2_rl_walk_mujoco.py lines 107-108, 214-223, 257-258"
+  }
+  # Source: v2_rl_walk_mujoco.py:103, 260
+  phase_period: {
+    type: double,
+    default_value: 100.0,
+    description: "Number of steps in one gait cycle period (PRM.nb_steps_in_period). Source: v2_rl_walk_mujoco.py lines 103, 260"
+  }
+
+  # Action filtering
+  # Source: v2_rl_walk_mujoco.py:37, 64-67, 300-306
+  cutoff_frequency: {
+    type: double,
+    default_value: 0.0,
+    description: "Cutoff frequency for low-pass action filter (Hz). 0.0 = no filtering. Source: v2_rl_walk_mujoco.py lines 37, 64-67, 300-306"
+  }
