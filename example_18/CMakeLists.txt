@@ -66,6 +66,9 @@ target_include_directories(observation_formatter PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/controllers/include>
   $<INSTALL_INTERFACE:include/motion_controller>
 )
+target_link_libraries(observation_formatter
+  ${control_msgs_TARGETS}
+)
 ament_target_dependencies(observation_formatter
   control_msgs
   geometry_msgs
@@ -96,6 +99,7 @@ target_include_directories(motion_controller PUBLIC
 target_link_libraries(motion_controller
   observation_formatter
   action_processor
+  ${control_msgs_TARGETS}
 )
 if(onnxruntime_FOUND)
   target_include_directories(motion_controller PRIVATE ${ONNXRUNTIME_INCLUDE_DIR})
@@ -156,6 +160,8 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_observation_formatter
     observation_formatter
+    rclcpp::rclcpp
+    ${control_msgs_TARGETS}
   )
   ament_target_dependencies(test_observation_formatter
     control_msgs

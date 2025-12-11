@@ -127,6 +127,9 @@ Run the demo
 
    .. code-block:: bash
 
+      # visual check
+      ros2 launch ros2_control_demo_example_18 view_robot.launch.py gui:=true
+      
       ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py
 
       # Check controllers

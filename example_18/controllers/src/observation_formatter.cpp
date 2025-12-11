@@ -58,7 +58,7 @@ ObservationFormatter::ObservationFormatter(
 }
 
 std::vector<float> ObservationFormatter::format(
-  const control_msgs::msg::InterfacesValues & interface_data,
+  const control_msgs::msg::Float64Values & interface_data,
   const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action)
 {
   // Note: velocity_cmd parameter kept for API compatibility but not used directly
@@ -163,7 +163,7 @@ std::vector<float> ObservationFormatter::format(
 }
 
 std::vector<double> ObservationFormatter::extract_joint_positions(
-  const control_msgs::msg::InterfacesValues & interface_data)
+  const control_msgs::msg::Float64Values & interface_data)
 {
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
@@ -177,7 +177,7 @@ std::vector<double> ObservationFormatter::extract_joint_positions(
 }
 
 std::vector<double> ObservationFormatter::extract_joint_velocities(
-  const control_msgs::msg::InterfacesValues & interface_data)
+  const control_msgs::msg::Float64Values & interface_data)
 {
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
@@ -216,7 +216,7 @@ void ObservationFormatter::set_interface_names(const std::vector<std::string> & 
 }
 
 void ObservationFormatter::extract_interface_data(
-  const control_msgs::msg::InterfacesValues & msg, std::vector<double> & gyro,
+  const control_msgs::msg::Float64Values & msg, std::vector<double> & gyro,
   std::vector<double> & accelero, std::vector<double> & joint_positions,
   std::vector<double> & joint_velocities)
 {

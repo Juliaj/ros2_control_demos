@@ -286,16 +286,16 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
   }
 
   // Create subscribers
-  interface_data_subscriber_ = get_node()->create_subscription<control_msgs::msg::InterfacesValues>(
+  interface_data_subscriber_ = get_node()->create_subscription<control_msgs::msg::Float64Values>(
     interfaces_broadcaster_topic_, rclcpp::SystemDefaultsQoS(),
-    [this](const control_msgs::msg::InterfacesValues::SharedPtr msg)
+    [this](const control_msgs::msg::Float64Values::SharedPtr msg)
     { rt_interface_data_.set(*msg); });
 
   interfaces_names_subscriber_ =
-    get_node()->create_subscription<control_msgs::msg::InterfacesNames>(
+    get_node()->create_subscription<control_msgs::msg::Keys>(
       interfaces_broadcaster_names_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local(),
-      [this](const control_msgs::msg::InterfacesNames::SharedPtr msg)
-      { rt_interface_names_.set(msg->names); });
+      [this](const control_msgs::msg::Keys::SharedPtr msg)
+      { rt_interface_names_.set(msg->keys); });
 
   velocity_command_subscriber_ =
     get_node()->create_subscription<example_18_motion_controller_msgs::msg::VelocityCommandWithHead>(
@@ -348,7 +348,7 @@ return_type MotionController::update(
   {
     return return_type::OK;
   }
-  control_msgs::msg::InterfacesValues interface_data = interface_data_op.value();
+  control_msgs::msg::Float64Values interface_data = interface_data_op.value();
 
   // Get latest velocity command from thread-safe buffer
   auto velocity_cmd_op = rt_velocity_command_.try_get();

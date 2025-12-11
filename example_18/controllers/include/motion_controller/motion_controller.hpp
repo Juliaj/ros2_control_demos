@@ -21,8 +21,8 @@
 #include <string>
 #include <vector>
 
-#include "control_msgs/msg/interfaces_names.hpp"
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/keys.hpp"
+#include "control_msgs/msg/float64_values.hpp"
 #include "controller_interface/controller_interface.hpp"
 #include "example_18_motion_controller_msgs/msg/velocity_command_with_head.hpp"
 #include "motion_controller/action_processor.hpp"
@@ -104,12 +104,12 @@ private:
 #endif
 
   // Subscribers
-  rclcpp::Subscription<control_msgs::msg::InterfacesValues>::SharedPtr interface_data_subscriber_;
-  rclcpp::Subscription<control_msgs::msg::InterfacesNames>::SharedPtr interfaces_names_subscriber_;
+  rclcpp::Subscription<control_msgs::msg::Float64Values>::SharedPtr interface_data_subscriber_;
+  rclcpp::Subscription<control_msgs::msg::Keys>::SharedPtr interfaces_names_subscriber_;
   rclcpp::Subscription<example_18_motion_controller_msgs::msg::VelocityCommandWithHead>::SharedPtr velocity_command_subscriber_;
 
   // Thread-safe message buffers
-  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::InterfacesValues> rt_interface_data_;
+  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::Float64Values> rt_interface_data_;
   realtime_tools::RealtimeThreadSafeBox<std::vector<std::string>> rt_interface_names_;
   realtime_tools::RealtimeThreadSafeBox<example_18_motion_controller_msgs::msg::VelocityCommandWithHead> rt_velocity_command_;
 

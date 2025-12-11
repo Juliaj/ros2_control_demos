@@ -17,20 +17,37 @@
 # Authors: Julia Jia
 
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterFile, ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    # Declare launch arguments
+    declared_arguments = []
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "gui",
+            default_value="true",
+            description="Start RViz2 automatically with this launch file.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_mock_hardware",
+            default_value="true",
+            description="Start robot with mock hardware mirroring command to its states.",
+        )
+    )
 
-    # NOTE: URDF is loaded ONLY for robot_state_publisher to compute TF transforms.
-    # The actual robot model for simulation is loaded by MuJoCo from scene.xml via
-    # the mujoco_model parameter in ros2_control xacro (open_duck_mini.ros2_control.xacro).
-    # This URDF should be minimal - containing only kinematic structure (links/joints)
-    # needed for TF tree computation, not the full robot description.
+    # Initialize arguments
+    gui = LaunchConfiguration("gui")
+    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
+
+    # Get URDF via xacro with mock hardware option
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -43,6 +60,9 @@ def generate_launch_description():
                     "open_duck_mini.urdf.xacro",
                 ]
             ),
+            " ",
+            "use_mock_hardware:=",
+            use_mock_hardware,
         ]
     )
 
@@ -58,73 +78,80 @@ def generate_launch_description():
         ),
     )
 
-    # robot_state_publisher: Publishes TF transforms based on joint states from joint_state_broadcaster.
-    # Requires minimal URDF with kinematic structure (links/joints) to compute TF tree.
-    # The actual simulation model comes from MuJoCo XML, not from this URDF.
+    # robot_state_publisher: Publishes TF transforms based on joint states
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
-        parameters=[
-            robot_description,
-            {"use_sim_time": True},
-        ],
+        parameters=[robot_description],
     )
 
+    # Control node using controller_manager (not mujoco_ros2_simulation)
     control_node = Node(
-        package="mujoco_ros2_simulation",
+        package="controller_manager",
         executable="ros2_control_node",
         output="both",
         parameters=[
-            {"use_sim_time": True},
+            robot_description,
             controller_parameters,
         ],
         arguments=["--log-level", "debug"],
-        env={"RCUTILS_LOGGING_SEVERITY": "DEBUG"},
     )
 
+    # Spawn joint_state_broadcaster
     spawn_joint_state_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
         name="spawn_joint_state_broadcaster",
-        arguments=[
-            "joint_state_broadcaster",
-            "--inactive",
-        ],
+        arguments=["joint_state_broadcaster"],
         output="both",
     )
 
+    # Spawn interfaces_state_broadcaster
     spawn_interfaces_state_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
         name="spawn_interfaces_state_broadcaster",
-        arguments=[
-            "interfaces_state_broadcaster",
-            "--inactive",
-        ],
+        arguments=["interfaces_state_broadcaster"],
         output="both",
     )
 
+    # Spawn motion_controller
     spawn_motion_controller = Node(
         package="controller_manager",
         executable="spawner",
         name="spawn_motion_controller",
-        arguments=[
-            "motion_controller",
-            "--inactive",
-        ],
+        arguments=["motion_controller"],
         output="both",
+    )
+
+    # RViz2 node (optional)
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="log",
+        arguments=[
+            "-d",
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("ros2_control_demo_description"),
+                    "rrbot/rviz/rrbot.rviz",
+                ]
+            ),
+        ],
+        condition=IfCondition(gui),
     )
 
     return LaunchDescription(
         [
-            # Enable debug logging globally
-            # SetEnvironmentVariable("RCUTILS_LOGGING_SEVERITY", "DEBUG"),
+            *declared_arguments,
             robot_state_publisher_node,
-            # control_node,
+            control_node,
             spawn_joint_state_broadcaster,
             spawn_interfaces_state_broadcaster,
             spawn_motion_controller,
+            rviz_node,
         ]
     )
 

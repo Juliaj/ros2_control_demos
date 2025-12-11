@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/float64_values.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "motion_controller/observation_formatter.hpp"
 
@@ -64,7 +64,7 @@ TEST_F(TestObservationFormatter, ObservationDimension)
 TEST_F(TestObservationFormatter, ObservationVectorFormat)
 {
   // Create test interface data
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.5;
   velocity_cmd.linear.y = 0.0;
@@ -129,7 +129,7 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
 TEST_F(TestObservationFormatter, RelativeJointPositions)
 {
   // Create interface data with joint positions
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
 
   // Interface data format: 10 IMU values + 2*num_joints_ (position + velocity per joint)
@@ -175,7 +175,7 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
 
 TEST_F(TestObservationFormatter, VelocityCommandFormat)
 {
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_data;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.3;
   velocity_cmd.linear.y = 0.2;

@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/float64_values.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
 namespace motion_controller
@@ -47,18 +47,18 @@ public:
   // 10. Feet contacts (2D: left, right)
   // 11. Imitation phase (2D: cos, sin)
   std::vector<float> format(
-    const control_msgs::msg::InterfacesValues & interface_data,
+    const control_msgs::msg::Float64Values & interface_data,
     const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action);
 
   size_t get_observation_dim() const { return observation_dim_; }
 
   // Extract joint positions from interface data (for initializing default positions)
   std::vector<double> extract_joint_positions(
-    const control_msgs::msg::InterfacesValues & interface_data);
+    const control_msgs::msg::Float64Values & interface_data);
 
   // Extract joint velocities from interface data (for initializing default velocities)
   std::vector<double> extract_joint_velocities(
-    const control_msgs::msg::InterfacesValues & interface_data);
+    const control_msgs::msg::Float64Values & interface_data);
 
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
@@ -96,9 +96,9 @@ public:
   void set_velocity_commands(const std::vector<double> & commands);
 
 private:
-  // Extract interface data (IMU and joint states) from interfaces_values message
+  // Extract interface data (IMU and joint states) from float64_values message
   void extract_interface_data(
-    const control_msgs::msg::InterfacesValues & msg, std::vector<double> & gyro,
+    const control_msgs::msg::Float64Values & msg, std::vector<double> & gyro,
     std::vector<double> & accelero, std::vector<double> & joint_positions,
     std::vector<double> & joint_velocities);
 
@@ -129,7 +129,7 @@ private:
   // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
 
-  // Names associated with incoming InterfacesValues message
+  // Names associated with incoming Float64Values message
   std::vector<std::string> interface_names_;
 
   // Track previous joint positions and velocities for relative calculations
