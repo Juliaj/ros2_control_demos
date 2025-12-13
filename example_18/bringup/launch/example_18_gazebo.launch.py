@@ -15,7 +15,14 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+    SetEnvironmentVariable,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
@@ -187,6 +194,16 @@ def generate_launch_description():
         parameters=[{"use_sim_time": use_sim_time}],
     )
 
+    # Delay controller spawners to wait for Gazebo and controller_manager to be ready
+    delayed_controller_spawners = TimerAction(
+        period=3.0,
+        actions=[
+            joint_state_broadcaster_spawner,
+            interfaces_state_broadcaster_spawner,
+            locomotion_controller_spawner,
+        ],
+    )
+
     nodes = [
         set_ign_resource_path,
         set_gz_resource_path,
@@ -194,9 +211,7 @@ def generate_launch_description():
         robot_state_publisher_node,
         spawn_entity_node,
         bridge_clock_node,
-        joint_state_broadcaster_spawner,
-        interfaces_state_broadcaster_spawner,
-        locomotion_controller_spawner,
+        delayed_controller_spawners,
     ]
 
     return LaunchDescription(declared_arguments + nodes)
