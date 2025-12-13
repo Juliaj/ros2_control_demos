@@ -18,7 +18,8 @@
 #include <string>
 #include <vector>
 
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/float64_values.hpp"
+#include "control_msgs/msg/keys.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
 namespace locomotion_controller
@@ -40,18 +41,21 @@ public:
   // 5. Joint velocities (N joints, absolute)
   // 6. Previous action (N joints)
   std::vector<float> format(
-    const control_msgs::msg::InterfacesValues & interface_data,
-    const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action);
+    const control_msgs::msg::Float64Values & interface_values,
+    const control_msgs::msg::Keys & interface_keys, const geometry_msgs::msg::Twist & velocity_cmd,
+    const std::vector<double> & previous_action);
 
   size_t get_observation_dim() const { return observation_dim_; }
 
   // Extract joint positions from interface data (for initializing default positions)
   std::vector<double> extract_joint_positions(
-    const control_msgs::msg::InterfacesValues & interface_data);
+    const control_msgs::msg::Float64Values & interface_values,
+    const control_msgs::msg::Keys & interface_keys);
 
   // Extract joint velocities from interface data (for initializing default velocities)
   std::vector<double> extract_joint_velocities(
-    const control_msgs::msg::InterfacesValues & interface_data);
+    const control_msgs::msg::Float64Values & interface_values,
+    const control_msgs::msg::Keys & interface_keys);
 
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
@@ -63,11 +67,11 @@ public:
   void set_interface_names(const std::vector<std::string> & interface_names);
 
 private:
-  // Extract interface data (IMU and joint states) from interfaces_values message
+  // Extract interface data (IMU and joint states) from interface messages
   void extract_interface_data(
-    const control_msgs::msg::InterfacesValues & msg, std::vector<double> & base_angular_velocity,
-    std::vector<double> & projected_gravity, std::vector<double> & joint_positions,
-    std::vector<double> & joint_velocities);
+    const control_msgs::msg::Float64Values & values, const control_msgs::msg::Keys & keys,
+    std::vector<double> & base_angular_velocity, std::vector<double> & projected_gravity,
+    std::vector<double> & joint_positions, std::vector<double> & joint_velocities);
 
   // Format velocity commands from Twist message
   // Returns [lin_vel_x, lin_vel_y, ang_vel_z, heading]
@@ -102,7 +106,7 @@ private:
   // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
 
-  // Names associated with incoming InterfacesValues message
+  // Names associated with incoming interface messages
   std::vector<std::string> interface_names_;
 
   // Track previous joint positions and velocities for relative calculations

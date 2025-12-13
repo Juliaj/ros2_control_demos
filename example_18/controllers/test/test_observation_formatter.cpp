@@ -16,7 +16,8 @@
 
 #include <vector>
 
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/float64_values.hpp"
+#include "control_msgs/msg/keys.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "locomotion_controller/observation_formatter.hpp"
 
@@ -61,7 +62,8 @@ TEST_F(TestObservationFormatter, ObservationDimension)
 TEST_F(TestObservationFormatter, ObservationVectorFormat)
 {
   // Create test interface data
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_values;
+  control_msgs::msg::Keys interface_keys;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.5;
   velocity_cmd.linear.y = 0.0;
@@ -75,7 +77,7 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
 
   // Format observation
   std::vector<float> observation =
-    formatter_->format(interface_data, velocity_cmd, previous_action);
+    formatter_->format(interface_values, interface_keys, velocity_cmd, previous_action);
 
   // Verify dimension
   EXPECT_EQ(observation.size(), formatter_->get_observation_dim());
@@ -120,7 +122,8 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
 TEST_F(TestObservationFormatter, RelativeJointPositions)
 {
   // Create interface data with joint positions
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_values;
+  control_msgs::msg::Keys interface_keys;
   geometry_msgs::msg::Twist velocity_cmd;
 
   // Interface data format: 10 IMU values + 2*num_joints_ (position + velocity per joint)
@@ -128,18 +131,18 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
   //          10-10+num_joints_-1 (joint positions), 10+num_joints_-10+2*num_joints_-1 (joint
   //          velocities)
   const size_t expected_size = 10 + 2 * num_joints_;
-  interface_data.values.resize(expected_size, 0.0);
+  interface_values.values.resize(expected_size, 0.0);
 
   // Set IMU orientation (required for extraction to work properly)
-  interface_data.values[0] = 0.0;  // orientation x
-  interface_data.values[1] = 0.0;  // orientation y
-  interface_data.values[2] = 0.0;  // orientation z
-  interface_data.values[3] = 1.0;  // orientation w
+  interface_values.values[0] = 0.0;  // orientation x
+  interface_values.values[1] = 0.0;  // orientation y
+  interface_values.values[2] = 0.0;  // orientation z
+  interface_values.values[3] = 1.0;  // orientation w
 
   // Set joint positions at correct indices (starting at 10)
   for (size_t i = 0; i < num_joints_; ++i)
   {
-    interface_data.values[10 + i] = 1.0;  // Absolute position
+    interface_values.values[10 + i] = 1.0;  // Absolute position
   }
 
   // Set default positions to 0.5
@@ -150,7 +153,7 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
 
   // Format observation
   std::vector<float> observation =
-    formatter_->format(interface_data, velocity_cmd, previous_action);
+    formatter_->format(interface_values, interface_keys, velocity_cmd, previous_action);
 
   // Verify joint positions are relative (1.0 - 0.5 = 0.5)
   for (size_t i = 0; i < num_joints_; ++i)
@@ -161,7 +164,8 @@ TEST_F(TestObservationFormatter, RelativeJointPositions)
 
 TEST_F(TestObservationFormatter, VelocityCommandFormat)
 {
-  control_msgs::msg::InterfacesValues interface_data;
+  control_msgs::msg::Float64Values interface_values;
+  control_msgs::msg::Keys interface_keys;
   geometry_msgs::msg::Twist velocity_cmd;
   velocity_cmd.linear.x = 0.3;
   velocity_cmd.linear.y = 0.2;
@@ -169,7 +173,7 @@ TEST_F(TestObservationFormatter, VelocityCommandFormat)
 
   std::vector<double> previous_action(num_joints_, 0.0);
   std::vector<float> observation =
-    formatter_->format(interface_data, velocity_cmd, previous_action);
+    formatter_->format(interface_values, interface_keys, velocity_cmd, previous_action);
 
   // Verify velocity commands are first 4 elements
   EXPECT_FLOAT_EQ(observation[0], 0.3f);  // lin_vel_x

@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-#include "control_msgs/msg/interfaces_names.hpp"
-#include "control_msgs/msg/interfaces_values.hpp"
+#include "control_msgs/msg/float64_values.hpp"
+#include "control_msgs/msg/keys.hpp"
 #include "controller_interface/controller_interface.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "locomotion_controller/action_processor.hpp"
@@ -102,13 +102,13 @@ private:
 #endif
 
   // Subscribers
-  rclcpp::Subscription<control_msgs::msg::InterfacesValues>::SharedPtr interface_data_subscriber_;
-  rclcpp::Subscription<control_msgs::msg::InterfacesNames>::SharedPtr interfaces_names_subscriber_;
+  rclcpp::Subscription<control_msgs::msg::Float64Values>::SharedPtr interface_values_subscriber_;
+  rclcpp::Subscription<control_msgs::msg::Keys>::SharedPtr interface_keys_subscriber_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr velocity_command_subscriber_;
 
   // Thread-safe message buffers
-  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::InterfacesValues> rt_interface_data_;
-  realtime_tools::RealtimeThreadSafeBox<std::vector<std::string>> rt_interface_names_;
+  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::Float64Values> rt_interface_values_;
+  realtime_tools::RealtimeThreadSafeBox<control_msgs::msg::Keys> rt_interface_keys_;
   realtime_tools::RealtimeThreadSafeBox<geometry_msgs::msg::Twist> rt_velocity_command_;
 
   // Internal state

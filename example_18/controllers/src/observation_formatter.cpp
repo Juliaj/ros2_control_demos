@@ -42,8 +42,9 @@ ObservationFormatter::ObservationFormatter(
 }
 
 std::vector<float> ObservationFormatter::format(
-  const control_msgs::msg::InterfacesValues & interface_data,
-  const geometry_msgs::msg::Twist & velocity_cmd, const std::vector<double> & previous_action)
+  const control_msgs::msg::Float64Values & interface_values,
+  const control_msgs::msg::Keys & interface_keys, const geometry_msgs::msg::Twist & velocity_cmd,
+  const std::vector<double> & previous_action)
 {
   // Extract interface data from message
   std::vector<double> base_angular_velocity;
@@ -52,7 +53,8 @@ std::vector<float> ObservationFormatter::format(
   std::vector<double> joint_velocities;
 
   extract_interface_data(
-    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+    interface_values, interface_keys, base_angular_velocity, projected_gravity, joint_positions,
+    joint_velocities);
 
   // Build observation vector in the correct order
   std::vector<float> observation;
@@ -128,7 +130,8 @@ std::vector<float> ObservationFormatter::format(
 }
 
 std::vector<double> ObservationFormatter::extract_joint_positions(
-  const control_msgs::msg::InterfacesValues & interface_data)
+  const control_msgs::msg::Float64Values & interface_values,
+  const control_msgs::msg::Keys & interface_keys)
 {
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
@@ -136,13 +139,15 @@ std::vector<double> ObservationFormatter::extract_joint_positions(
   std::vector<double> joint_velocities;
 
   extract_interface_data(
-    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+    interface_values, interface_keys, base_angular_velocity, projected_gravity, joint_positions,
+    joint_velocities);
 
   return joint_positions;
 }
 
 std::vector<double> ObservationFormatter::extract_joint_velocities(
-  const control_msgs::msg::InterfacesValues & interface_data)
+  const control_msgs::msg::Float64Values & interface_values,
+  const control_msgs::msg::Keys & interface_keys)
 {
   std::vector<double> base_angular_velocity;
   std::vector<double> projected_gravity;
@@ -150,7 +155,8 @@ std::vector<double> ObservationFormatter::extract_joint_velocities(
   std::vector<double> joint_velocities;
 
   extract_interface_data(
-    interface_data, base_angular_velocity, projected_gravity, joint_positions, joint_velocities);
+    interface_values, interface_keys, base_angular_velocity, projected_gravity, joint_positions,
+    joint_velocities);
 
   return joint_velocities;
 }
@@ -195,9 +201,9 @@ std::vector<float> ObservationFormatter::format_velocity_commands(
 }
 
 void ObservationFormatter::extract_interface_data(
-  const control_msgs::msg::InterfacesValues & msg, std::vector<double> & base_angular_velocity,
-  std::vector<double> & projected_gravity, std::vector<double> & joint_positions,
-  std::vector<double> & joint_velocities)
+  const control_msgs::msg::Float64Values & values, const control_msgs::msg::Keys & /* keys */,
+  std::vector<double> & base_angular_velocity, std::vector<double> & projected_gravity,
+  std::vector<double> & joint_positions, std::vector<double> & joint_velocities)
 {
   base_angular_velocity.clear();
   projected_gravity.clear();
@@ -220,7 +226,7 @@ void ObservationFormatter::extract_interface_data(
   // 10-21: Joint positions (num_joints_)
   // 22-33: Joint velocities (num_joints_)
   const size_t expected_size = 10 + 2 * num_joints_;  // 10 IMU + 2*num_joints_ (pos+vel)
-  const size_t count = std::min(interface_names_.size(), msg.values.size());
+  const size_t count = std::min(interface_names_.size(), values.values.size());
 
   // Validate interface count matches expected size
   if (count < expected_size)
@@ -242,10 +248,10 @@ void ObservationFormatter::extract_interface_data(
   bool imu_orientation_found = false;
   if (count >= 4)
   {
-    imu_orientation_x = msg.values[0];
-    imu_orientation_y = msg.values[1];
-    imu_orientation_z = msg.values[2];
-    imu_orientation_w = msg.values[3];
+    imu_orientation_x = values.values[0];
+    imu_orientation_y = values.values[1];
+    imu_orientation_z = values.values[2];
+    imu_orientation_w = values.values[3];
     imu_orientation_found = true;
   }
 
@@ -253,9 +259,9 @@ void ObservationFormatter::extract_interface_data(
   bool imu_ang_vel_found[3] = {false, false, false};
   if (count >= 7)
   {
-    base_angular_velocity[0] = msg.values[4];
-    base_angular_velocity[1] = msg.values[5];
-    base_angular_velocity[2] = msg.values[6];
+    base_angular_velocity[0] = values.values[4];
+    base_angular_velocity[1] = values.values[5];
+    base_angular_velocity[2] = values.values[6];
     imu_ang_vel_found[0] = true;
     imu_ang_vel_found[1] = true;
     imu_ang_vel_found[2] = true;
@@ -268,8 +274,8 @@ void ObservationFormatter::extract_interface_data(
   {
     for (size_t i = 0; i < num_joints_; ++i)
     {
-      joint_positions[i] = msg.values[joint_pos_start + i];
-      joint_velocities[i] = msg.values[joint_vel_start + i];
+      joint_positions[i] = values.values[joint_pos_start + i];
+      joint_velocities[i] = values.values[joint_vel_start + i];
     }
   }
   else if (count >= joint_pos_start + num_joints_)
@@ -277,7 +283,7 @@ void ObservationFormatter::extract_interface_data(
     // Only positions available
     for (size_t i = 0; i < num_joints_; ++i)
     {
-      joint_positions[i] = msg.values[joint_pos_start + i];
+      joint_positions[i] = values.values[joint_pos_start + i];
     }
   }
 

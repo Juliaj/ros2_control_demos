@@ -249,16 +249,14 @@ CallbackReturn LocomotionController::on_configure(
   }
 
   // Create subscribers
-  interface_data_subscriber_ = get_node()->create_subscription<control_msgs::msg::InterfacesValues>(
+  interface_values_subscriber_ = get_node()->create_subscription<control_msgs::msg::Float64Values>(
     interfaces_broadcaster_topic_, rclcpp::SystemDefaultsQoS(),
-    [this](const control_msgs::msg::InterfacesValues::SharedPtr msg)
-    { rt_interface_data_.set(*msg); });
+    [this](const control_msgs::msg::Float64Values::SharedPtr msg)
+    { rt_interface_values_.set(*msg); });
 
-  interfaces_names_subscriber_ =
-    get_node()->create_subscription<control_msgs::msg::InterfacesNames>(
-      interfaces_broadcaster_names_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local(),
-      [this](const control_msgs::msg::InterfacesNames::SharedPtr msg)
-      { rt_interface_names_.set(msg->names); });
+  interface_keys_subscriber_ = get_node()->create_subscription<control_msgs::msg::Keys>(
+    interfaces_broadcaster_names_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local(),
+    [this](const control_msgs::msg::Keys::SharedPtr msg) { rt_interface_keys_.set(*msg); });
 
   velocity_command_subscriber_ = get_node()->create_subscription<geometry_msgs::msg::Twist>(
     velocity_command_topic_, rclcpp::SystemDefaultsQoS(),
@@ -304,13 +302,21 @@ CallbackReturn LocomotionController::on_deactivate(
 return_type LocomotionController::update(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // Get latest interface data from thread-safe buffer
-  auto interface_data_op = rt_interface_data_.try_get();
-  if (!interface_data_op.has_value())
+  // Get latest interface values from thread-safe buffer
+  auto interface_values_op = rt_interface_values_.try_get();
+  if (!interface_values_op.has_value())
   {
     return return_type::OK;
   }
-  control_msgs::msg::InterfacesValues interface_data = interface_data_op.value();
+  control_msgs::msg::Float64Values interface_values = interface_values_op.value();
+
+  // Get latest interface keys from thread-safe buffer
+  control_msgs::msg::Keys interface_keys;
+  auto interface_keys_op = rt_interface_keys_.try_get();
+  if (interface_keys_op.has_value())
+  {
+    interface_keys = interface_keys_op.value();
+  }
 
   // Get latest velocity command from thread-safe buffer
   auto velocity_cmd_op = rt_velocity_command_.try_get();
@@ -345,15 +351,16 @@ return_type LocomotionController::update(
   }
 
   // Refresh interface name mapping when broadcaster publishes it
-  if (auto names_op = rt_interface_names_.try_get(); names_op.has_value())
+  if (interface_keys_op.has_value())
   {
-    observation_formatter_->set_interface_names(names_op.value());
+    observation_formatter_->set_interface_names(interface_keys.keys);
   }
 
   // Initialize default joint positions from current sensor data (first update only)
   if (!default_joint_positions_initialized_)
   {
-    default_joint_positions_ = observation_formatter_->extract_joint_positions(interface_data);
+    default_joint_positions_ =
+      observation_formatter_->extract_joint_positions(interface_values, interface_keys);
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
 
@@ -396,7 +403,8 @@ return_type LocomotionController::update(
     std::vector<float> model_inputs;
     try
     {
-      model_inputs = observation_formatter_->format(interface_data, velocity_cmd, previous_action_);
+      model_inputs = observation_formatter_->format(
+        interface_values, interface_keys, velocity_cmd, previous_action_);
 
       // Debug: Log first 4 elements (velocity commands) sent to model
       if (model_inputs.size() >= 4)
