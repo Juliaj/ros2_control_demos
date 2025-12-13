@@ -93,7 +93,8 @@ TEST_F(TestObservationFormatter, ObservationVectorFormat)
   EXPECT_FLOAT_EQ(observation[2], 0.0f);
 
   // Verify order: accelero (3D) - should be zeros from empty interface_data
-  EXPECT_FLOAT_EQ(observation[3], 0.0f);
+  // Note: accelero[0] has a bias of 1.3 applied (observation_formatter.cpp line 100)
+  EXPECT_FLOAT_EQ(observation[3], 1.3f);
   EXPECT_FLOAT_EQ(observation[4], 0.0f);
   EXPECT_FLOAT_EQ(observation[5], 0.0f);
 

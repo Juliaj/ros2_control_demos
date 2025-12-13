@@ -99,6 +99,13 @@ Compile the demo
       # build the example_18 from project root
       colcon build --symlink-install --packages-select ros2_control_demo_example_18
 
+      # source the workspace in this order
+      source /opt/ros/jazzy/setup.bash
+
+      source ../mujoco_ros2_simulation/install/setup.bash
+
+      source install/setup.bash
+
 
 Run the demo
 ------------

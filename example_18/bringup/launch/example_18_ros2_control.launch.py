@@ -151,7 +151,7 @@ def generate_launch_description():
             spawn_joint_state_broadcaster,
             spawn_interfaces_state_broadcaster,
             spawn_motion_controller,
-            rviz_node,
+            # rviz_node,
         ]
     )
 

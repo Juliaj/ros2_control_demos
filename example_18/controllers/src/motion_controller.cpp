@@ -1203,11 +1203,34 @@ void MotionController::validate_model_structure(size_t num_inputs, size_t num_ou
       joint_names_.size(), joint_names_.size(), expected_input_size);
   }
 
-  if (output_shape_.empty() || output_shape_[0] != static_cast<int64_t>(joint_names_.size()))
+  // Check model output size - allow dynamic dimensions (-1) which will be validated at runtime
+  bool has_dynamic_output = false;
+  if (!output_shape_.empty())
+  {
+    for (auto dim : output_shape_)
+    {
+      if (dim == -1)
+      {
+        has_dynamic_output = true;
+        break;
+      }
+    }
+  }
+
+  if (!has_dynamic_output && !output_shape_.empty() &&
+      output_shape_[0] != static_cast<int64_t>(joint_names_.size()))
   {
     RCLCPP_WARN(
-      get_node()->get_logger(), "Model output size may not match number of joints (%zu)",
-      joint_names_.size());
+      get_node()->get_logger(),
+      "Model output size (%ld) does not match number of joints (%zu). "
+      "This may cause runtime errors if model outputs don't match joint count.",
+      output_shape_[0], joint_names_.size());
+  }
+  else if (has_dynamic_output)
+  {
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Model has dynamic output dimensions - will validate actual output size at runtime");
   }
 }
 #endif
