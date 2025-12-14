@@ -27,7 +27,7 @@ steps:
    avoiding unnecessary memory allocation.
 
 2. Tensor shape: The shape is represented as ``std::vector<int64_t>``, for
-   example ``[1, 46]`` for a batch size of 1 and 46 features. Dynamic
+   example ``[1, 45]`` for a batch size of 1 and 45 features. Dynamic
    dimensions (marked as -1 in the model) are resolved at runtime based on
    the actual input size.
 

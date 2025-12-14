@@ -406,13 +406,13 @@ return_type LocomotionController::update(
       model_inputs = observation_formatter_->format(
         interface_values, interface_keys, velocity_cmd, previous_action_);
 
-      // Debug: Log first 4 elements (velocity commands) sent to model
-      if (model_inputs.size() >= 4)
+      // Debug: Log first 3 elements (velocity commands) sent to model
+      if (model_inputs.size() >= 3)
       {
         RCLCPP_DEBUG_THROTTLE(
           get_node()->get_logger(), *get_node()->get_clock(), 2000,
-          "Velocity commands sent to model: [lin_x=%.4f, lin_y=%.4f, ang_z=%.4f, heading=%.4f]",
-          model_inputs[0], model_inputs[1], model_inputs[2], model_inputs[3]);
+          "Velocity commands sent to model: [lin_x=%.4f, lin_y=%.4f, ang_z=%.4f]", model_inputs[0],
+          model_inputs[1], model_inputs[2]);
       }
     }
     catch (const std::exception & e)
@@ -1037,7 +1037,7 @@ void LocomotionController::validate_model_structure(size_t num_inputs, size_t nu
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Expected observation dimension (from config): %zu (10 + 3*%zu joints)", expected_input_size,
+    "Expected observation dimension (from config): %zu (9 + 3*%zu joints)", expected_input_size,
     joint_names_.size());
   RCLCPP_INFO(get_node()->get_logger(), "Model input shape: %s", shape_str.c_str());
 
@@ -1061,12 +1061,30 @@ void LocomotionController::validate_model_structure(size_t num_inputs, size_t nu
       model_input_size, expected_input_size);
     RCLCPP_ERROR(
       get_node()->get_logger(),
-      "Expected from env_cfg.py: 4 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity) "
+      "Expected from env_cfg.py: 3 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity) "
       "+ %zu (joint_pos) + %zu (joint_vel) + %zu (previous_action) = %zu",
       joint_names_.size(), joint_names_.size(), joint_names_.size(), expected_input_size);
   }
 
-  if (output_shape_.empty() || output_shape_[0] != static_cast<int64_t>(joint_names_.size()))
+  // Check output shape: handle both [N] and [batch, N] formats
+  // If shape is [batch, N], check last dimension; if [N], check first dimension
+  bool output_size_matches = false;
+  if (!output_shape_.empty())
+  {
+    if (output_shape_.size() == 1)
+    {
+      // Shape is [N] - check first dimension
+      output_size_matches = (output_shape_[0] == static_cast<int64_t>(joint_names_.size()));
+    }
+    else
+    {
+      // Shape is [batch, N] or [..., N] - check last dimension
+      output_size_matches =
+        (output_shape_[output_shape_.size() - 1] == static_cast<int64_t>(joint_names_.size()));
+    }
+  }
+
+  if (!output_size_matches)
   {
     RCLCPP_WARN(
       get_node()->get_logger(), "Model output size may not match number of joints (%zu)",

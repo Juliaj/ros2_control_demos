@@ -56,14 +56,14 @@ Observation Vector Format
 
 The observation vector is concatenated in this order:
 
-1. Velocity commands (4D: lin_vel_x, lin_vel_y, ang_vel_z, heading)
+1. Velocity commands (3D: lin_vel_x, lin_vel_y, ang_vel_z)
 2. Base angular velocity (3D vector from IMU)
 3. Projected gravity vector (3D vector from IMU orientation)
 4. Joint positions (N joints, relative to default positions)
 5. Joint velocities (N joints, absolute)
 6. Previous action (N joints)
 
-Total dimension: 10 + 3*N (where N = number of leg joints)
+Total dimension: 9 + 3*N (where N = number of leg joints)
 
 Gazebo Integration
 ------------------
@@ -91,4 +91,4 @@ User Command Interface
 
 Publish geometry_msgs/Twist messages to the velocity command topic (default: ~/cmd_vel).
 
-Example: To command forward walking at 0.5 m/s, publish Twist with linear.x = 0.5, linear.y = 0.0, angular.z = 0.0. The controller formats this as [0.5, 0.0, 0.0, 0.0] (lin_vel_x, lin_vel_y, ang_vel_z, heading) and includes it in the observation vector.
+Example: To command forward walking at 0.5 m/s, publish Twist with linear.x = 0.5, linear.y = 0.0, angular.z = 0.0. The controller formats this as [0.5, 0.0, 0.0] (lin_vel_x, lin_vel_y, ang_vel_z) and includes it in the observation vector.

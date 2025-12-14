@@ -95,7 +95,7 @@ Run the demo
       # The robot will circle or not move if no commands are received
 
       # Sanity check: Send a single command to verify the controller is receiving messages
-      # Format: [lin_vel_x, lin_vel_y, ang_vel_z] (heading defaults to 0.0)
+      # Format: [lin_vel_x, lin_vel_y, ang_vel_z] (heading is not included in observation)
       # Example from policy_biped_25hz_b.yaml config
       # Note: This is for testing only - the command is used once, then controller falls back to default pose
       ros2 topic pub --once /locomotion_controller/cmd_vel geometry_msgs/msg/Twist \
@@ -147,7 +147,7 @@ Note: The controller does not maintain the last received command - it only uses 
 
 
 Expected behaviour: the robot spawns balanced, follows velocity commands, and logs
-warnings if the observation vector dimension deviates from ``10 + 3*N`` (``N=12``).
+warnings if the observation vector dimension deviates from ``9 + 3*N`` (``N=12``).
 
 Testing
 -------
@@ -202,27 +202,9 @@ Observation Vector Dimension
 The dimensions are determined by the source code and `IsaacLab MDP documentation <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html>`_.
 
 1. generated_commands (line 51-54):
-   - Output: 4D when heading_command=True
-   - From UniformVelocityCommandCfg: [lin_vel_x, lin_vel_y, ang_vel_z, heading]
-   - Without heading: 3D [lin_vel_x, lin_vel_y, ang_vel_z]
-
-   .. code-block:: python
-
-      base_velocity = mdp.UniformVelocityCommandCfg(
-          resampling_time_range=(10.0, 10.0),
-          debug_vis=True,
-          asset_name="robot",
-          heading_command=True,
-          heading_control_stiffness=0.5,
-          rel_standing_envs=0.02,
-          rel_heading_envs=1.0,
-          ranges=mdp.UniformVelocityCommandCfg.Ranges(
-              lin_vel_x=(-0.5, 0.5),
-              lin_vel_y=(-0.25, 0.25),
-              ang_vel_z=(-1.0, 1.0),
-              heading=(-math.pi, math.pi),
-          ),
-      )
+   - Output: 3D [lin_vel_x, lin_vel_y, ang_vel_z]
+   - Note: The ROS2 implementation uses 3D velocity commands (without heading) to match models trained without heading_command
+   - From UniformVelocityCommandCfg: Can be 4D when heading_command=True, but this implementation uses 3D
 
 2. base_ang_vel (line 55-58):
    - Output: 3D
@@ -246,7 +228,7 @@ The dimensions are determined by the source code and `IsaacLab MDP documentation
    - Output: N dimensions (one per joint in HUMANOID_LITE_LEG_JOINTS)
    - `mdp.last_action <https://isaac-sim.github.io/IsaacLab/main/source/api/lab/isaaclab.envs.mdp.html#isaaclab.envs.mdp.last_action>`_ returns torch.Tensor with shape (N,)
 
-Your ROS2 implementation matches these dimensions: 4 + 3 + 3 + N + N + N = 10 + 3N.
+Your ROS2 implementation matches these dimensions: 3 + 3 + 3 + N + N + N = 9 + 3N.
 
 Debugging Dimension Mismatch Errors
 -------------------------------------
@@ -256,12 +238,12 @@ If you encounter "Got invalid dimensions for input: obs" error:
 1. Check ONNX model metadata: The controller prints detailed model information on startup:
    - Look for ``=== ONNX Model Input Metadata ===`` section
    - Shows input name, shape, and data type
-   - Example: ``Input[0]: name='obs', shape=[1, 46], type=float32``
+   - Example: ``Input[0]: name='obs', shape=[1, 45], type=float32``
    - Also prints output metadata: ``=== ONNX Model Output Metadata ===``
 
 2. Compare with config: The controller compares model expectations with ``env_cfg.py``:
-   - Expected: ``10 + 3*N`` where N = number of joints
-   - Shows breakdown: ``4 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity) + N (joint_pos) + N (joint_vel) + N (previous_action)``
+   - Expected: ``9 + 3*N`` where N = number of joints
+   - Shows breakdown: ``3 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity) + N (joint_pos) + N (joint_vel) + N (previous_action)``
 
 3. Verify observation size: The controller validates observation size. Check logs for:
    - ``Observation size mismatch: got X, expected Y``
@@ -271,7 +253,8 @@ If you encounter "Got invalid dimensions for input: obs" error:
    - Model input name: Check if model expects ``'obs'`` or different name (printed in metadata)
    - Previous action size: Ensure ``previous_action_`` is initialized with ``joint_names_.size()`` elements
    - Joint count mismatch: Verify number of joints matches model training (12 for biped)
-   - Model shape: ONNX models may expect ``[1, 46]`` (with batch) or ``[46]`` (without batch)
+   - Model shape: ONNX models may expect ``[1, 45]`` (with batch) or ``[45]`` (without batch)
+   - Output shape: Model output may be ``[1, 12]`` (with batch) or ``[12]`` (without batch) - the controller handles both formats
    - Dynamic dimensions: Models with ``-1`` in input shape are handled automatically
 
 5. Debug steps:
@@ -281,7 +264,7 @@ If you encounter "Got invalid dimensions for input: obs" error:
    - Ensure default joint positions are initialized before first inference
    - Compare model's expected input shape with ``env_cfg.py`` observation configuration
 
-For example, if there are 12 leg joints, the observation vector dimension will be 10 + 3*12 = 46.
+For example, if there are 12 leg joints, the observation vector dimension will be 9 + 3*12 = 45.
 
 Debugging Action Quality Issues
 --------------------------------

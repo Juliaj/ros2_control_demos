@@ -34,7 +34,7 @@ public:
   // Extract sensor data and format into model input vector
   // Observation order (based on
   // berkeley_humanoid_lite/tasks/locomotion/velocity/config/biped/env_cfg.py):
-  // 1. Velocity commands (4D: lin_vel_x, lin_vel_y, ang_vel_z, heading)
+  // 1. Velocity commands (3D: lin_vel_x, lin_vel_y, ang_vel_z)
   // 2. Base angular velocity (3D vector from IMU)
   // 3. Projected gravity vector (3D vector from IMU orientation)
   // 4. Joint positions (N joints, relative to default positions)
@@ -74,7 +74,7 @@ private:
     std::vector<double> & joint_positions, std::vector<double> & joint_velocities);
 
   // Format velocity commands from Twist message
-  // Returns [lin_vel_x, lin_vel_y, ang_vel_z, heading]
+  // Returns [lin_vel_x, lin_vel_y, ang_vel_z]
   std::vector<float> format_velocity_commands(const geometry_msgs::msg::Twist & velocity_cmd);
 
   // Compute projected gravity vector from IMU orientation quaternion
@@ -92,7 +92,7 @@ private:
 
   std::vector<std::string> joint_names_;
   size_t num_joints_;
-  size_t observation_dim_;  // 10 + 3*N (velocity_commands: 4, base_ang_vel: 3, projected_gravity:
+  size_t observation_dim_;  // 9 + 3*N (velocity_commands: 3, base_ang_vel: 3, projected_gravity:
                             // 3, joint_pos: N, joint_vel: N, actions: N)
 
   // Default joint positions for relative position calculation

@@ -36,9 +36,9 @@ ObservationFormatter::ObservationFormatter(
   previous_joint_velocities_(num_joints_, 0.0),
   previous_states_initialized_(false)
 {
-  // Observation dimension: 4 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity)
-  // + N (joint_pos) + N (joint_vel) + N (actions) = 10 + 3*N
-  observation_dim_ = 10 + 3 * num_joints_;
+  // Observation dimension: 3 (velocity_commands) + 3 (base_ang_vel) + 3 (projected_gravity)
+  // + N (joint_pos) + N (joint_vel) + N (actions) = 9 + 3*N
+  observation_dim_ = 9 + 3 * num_joints_;
 }
 
 std::vector<float> ObservationFormatter::format(
@@ -60,12 +60,12 @@ std::vector<float> ObservationFormatter::format(
   std::vector<float> observation;
   observation.reserve(observation_dim_);
 
-  // 1. Velocity commands (4D: lin_vel_x, lin_vel_y, ang_vel_z, heading)
+  // 1. Velocity commands (3D: lin_vel_x, lin_vel_y, ang_vel_z)
   std::vector<float> velocity_commands = format_velocity_commands(velocity_cmd);
-  if (velocity_commands.size() != 4)
+  if (velocity_commands.size() != 3)
   {
     throw std::runtime_error(
-      "Velocity commands size mismatch: expected 4, got " +
+      "Velocity commands size mismatch: expected 3, got " +
       std::to_string(velocity_commands.size()));
   }
   observation.insert(observation.end(), velocity_commands.begin(), velocity_commands.end());
@@ -189,15 +189,12 @@ void ObservationFormatter::set_interface_names(const std::vector<std::string> & 
 std::vector<float> ObservationFormatter::format_velocity_commands(
   const geometry_msgs::msg::Twist & velocity_cmd)
 {
-  // Format: [lin_vel_x, lin_vel_y, ang_vel_z, heading]
-  // Note: heading is not available in Twist, set to 0.0
-  // This matches the observation format from env_cfg.py
+  // Format: [lin_vel_x, lin_vel_y, ang_vel_z]
+  // Model expects 3D velocity commands (without heading)
+  // This matches the observation format from env_cfg.py for models trained without heading
   return {
     static_cast<float>(velocity_cmd.linear.x), static_cast<float>(velocity_cmd.linear.y),
-    static_cast<float>(velocity_cmd.angular.z),
-    0.0f  // heading (not available in Twist message): 0.0 = no heading change (maintain current
-          // direction)
-  };
+    static_cast<float>(velocity_cmd.angular.z)};
 }
 
 void ObservationFormatter::extract_interface_data(
