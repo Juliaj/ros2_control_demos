@@ -41,9 +41,9 @@ CallbackReturn MotionController::on_init()
     get_node()->declare_parameter<std::vector<std::string>>("joints", std::vector<std::string>());
     get_node()->declare_parameter<std::string>("model_path", "");
     get_node()->declare_parameter<std::string>(
-      "interfaces_broadcaster_topic", "interfaces_state_broadcaster/values");
+      "interfaces_broadcaster_topic", "state_interfaces_broadcaster/values");
     get_node()->declare_parameter<std::string>(
-      "interfaces_broadcaster_names_topic", "interfaces_state_broadcaster/names");
+      "interfaces_broadcaster_names_topic", "state_interfaces_broadcaster/names");
     get_node()->declare_parameter<std::string>("velocity_command_topic", "~/cmd_vel");
     get_node()->declare_parameter<std::vector<double>>(
       "joint_position_limits_min", std::vector<double>());

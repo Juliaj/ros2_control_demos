@@ -66,7 +66,7 @@ public:
   // Set default joint velocities (placeholder for future use)
   void set_default_joint_velocities(const std::vector<double> & default_velocities);
 
-  // Define mapping between interface indices and names published by interfaces_state_broadcaster
+  // Define mapping between interface indices and names published by state_interfaces_broadcaster
   void set_interface_names(const std::vector<std::string> & interface_names);
 
   // Update action history (3 previous actions)

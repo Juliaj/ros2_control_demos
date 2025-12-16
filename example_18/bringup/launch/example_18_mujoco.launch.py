@@ -16,6 +16,8 @@
 #
 # Authors: Julia Jia
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import SetEnvironmentVariable
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
@@ -79,8 +81,6 @@ def generate_launch_description():
             {"use_sim_time": True},
             controller_parameters,
         ],
-        arguments=["--log-level", "debug"],
-        env={"RCUTILS_LOGGING_SEVERITY": "DEBUG"},
     )
 
     spawn_joint_state_broadcaster = Node(
@@ -94,12 +94,12 @@ def generate_launch_description():
         output="both",
     )
 
-    spawn_interfaces_state_broadcaster = Node(
+    spawn_state_interfaces_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
-        name="spawn_interfaces_state_broadcaster",
+        name="spawn_state_interfaces_broadcaster",
         arguments=[
-            "interfaces_state_broadcaster",
+            "state_interfaces_broadcaster",
             "--inactive",
         ],
         output="both",
@@ -118,12 +118,10 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # Enable debug logging globally
-            # SetEnvironmentVariable("RCUTILS_LOGGING_SEVERITY", "DEBUG"),
             robot_state_publisher_node,
-            # control_node,
+            control_node,
             spawn_joint_state_broadcaster,
-            spawn_interfaces_state_broadcaster,
+            spawn_state_interfaces_broadcaster,
             spawn_motion_controller,
         ]
     )

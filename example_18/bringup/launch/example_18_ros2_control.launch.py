@@ -107,12 +107,12 @@ def generate_launch_description():
         output="both",
     )
 
-    # Spawn interfaces_state_broadcaster
-    spawn_interfaces_state_broadcaster = Node(
+    # Spawn state_interfaces_broadcaster
+    spawn_state_interfaces_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
-        name="spawn_interfaces_state_broadcaster",
-        arguments=["interfaces_state_broadcaster"],
+        name="spawn_state_interfaces_broadcaster",
+        arguments=["state_interfaces_broadcaster"],
         output="both",
     )
 
@@ -149,7 +149,7 @@ def generate_launch_description():
             robot_state_publisher_node,
             control_node,
             spawn_joint_state_broadcaster,
-            spawn_interfaces_state_broadcaster,
+            spawn_state_interfaces_broadcaster,
             spawn_motion_controller,
             # rviz_node,
         ]

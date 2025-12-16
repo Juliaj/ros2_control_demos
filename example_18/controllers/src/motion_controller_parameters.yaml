@@ -20,8 +20,8 @@ motion_controller:
   # ROS2 topic configuration
   interfaces_broadcaster_topic: {
     type: string,
-    default_value: "interfaces_state_broadcaster/values",
-    description: "Topic name from interfaces_state_broadcaster"
+    default_value: "state_interfaces_broadcaster/values",
+    description: "Topic name from state_interfaces_broadcaster"
   }
   velocity_command_topic: {
     type: string,

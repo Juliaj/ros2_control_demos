@@ -24,8 +24,8 @@ controller_manager:
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-    interfaces_state_broadcaster:
-      type: interfaces_state_broadcaster/InterfacesStateBroadcaster
+    state_interfaces_broadcaster:
+      type: state_interfaces_broadcaster/StateInterfacesBroadcaster
     motion_controller:
       type: motion_controller/MotionController
 
@@ -47,7 +47,7 @@ joint_state_broadcaster:
       - right_knee
       - right_ankle
 
-interfaces_state_broadcaster:
+state_interfaces_broadcaster:
   ros__parameters:
     interfaces:
       # IMU sensor interfaces (indices 0-9)
@@ -138,7 +138,7 @@ motion_controller:
 
     # ROS2 topic configuration
     # Source: Standard ROS2 topic naming conventions
-    interfaces_broadcaster_topic: "interfaces_state_broadcaster/values"
+    interfaces_broadcaster_topic: "state_interfaces_broadcaster/values"
     velocity_command_topic: "~/cmd_vel"
     feet_contact_topic: "~/feet_contacts"
 

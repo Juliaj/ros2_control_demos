@@ -3,7 +3,7 @@ ros2_control_demo_example_18
 
 This demo runs a policy driven 
 `(Open Duck Mini v2) <https://github.com/apirrone/Open_Duck_Mini/tree/v2/mini_bdx/robots/open_duck_mini_v2 >`_
-in Mujoco and streams observations via ``interfaces_state_broadcaster``.
+in Mujoco and streams observations via ``state_interfaces_broadcaster``.
 
 Setup
 -----
@@ -170,7 +170,7 @@ End-to-end validation
 
 After the launch sequence above:
 
-- Monitor ``/interfaces_state_broadcaster/values`` and ``/imu_sensor_broadcaster_1/imu`` to confirm sensor flow.
+- Monitor ``/state_interfaces_broadcaster/values`` and ``/imu_sensor_broadcaster_1/imu`` to confirm sensor flow.
 - Check ``ros2 topic echo /joint_states`` to ensure the forward position controller reflects ONNX outputs.
 - Try alternative ``cmd_vel`` inputs (turning, reverse) to ensure stability.
 - Review the controller logs at ``--log-level debug`` if the observation vector size mismatches the ONNX model.
@@ -184,8 +184,8 @@ Architecture
        ↓ (joint states, IMU data)
    [Hardware Interface]
        ↓ (state interfaces)
-   [Interfaces State Broadcaster]
-       ↓ (ROS2 topic: /interfaces_state_broadcaster/values)
+   [State Interfaces Broadcaster]
+       ↓ (ROS2 topic: /state_interfaces_broadcaster/values)
    [Locomotion Controller]
        ↑ (ROS2 topic: /motion_controller/cmd_vel - velocity commands)
        ↓ (ONNX inference)
