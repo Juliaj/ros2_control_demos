@@ -88,13 +88,13 @@ The volume mount allows you to modify code on the host and see changes without r
 
 Compile the demo
 -----------------
-1. Build mujoco_ros2_simulation, follow the instruction from https://github.com/ros-controls/mujoco_ros2_simulation
+1. Build mujoco_ros2_control, follow the instruction from https://github.com/ros-controls/mujoco_ros2_control
 2. From your ROS 2 workspace,
 
    .. code-block:: bash
 
-      # source the mujoco_ros2_simulation setup.bash
-      source /update_me/mujoco_ros2_simulation/install/setup.bash
+      # source the mujoco_ros2_control setup.bash
+      source /update_me/mujoco_ros2_control/install/setup.bash
 
       # build the example_18 from project root
       colcon build --symlink-install --packages-select ros2_control_demo_example_18
@@ -102,7 +102,7 @@ Compile the demo
       # source the workspace in this order
       source /opt/ros/jazzy/setup.bash
 
-      source ../mujoco_ros2_simulation/install/setup.bash
+      source ../mujoco_ros2_control/install/setup.bash
 
       source install/setup.bash
 
@@ -110,14 +110,14 @@ Compile the demo
 Run the demo
 ------------
 
-1. Set up Mujoco simulation shell environment, follow the instruction from https://github.com/ros-controls/mujoco_ros2_simulation
+1. Set up Mujoco simulation shell environment, follow the instruction from https://github.com/ros-controls/mujoco_ros2_control
 
    .. code-block:: bash
 
-      # from the folder you have mujoco_ros2_simulation git repo
+      # from the folder you have mujoco_ros2_control git repo
       pixi shell
 
-      # install the mujoco_ros2_simulation
+      # install the mujoco_ros2_control
       source install/setup.bash
 
 
@@ -125,7 +125,7 @@ Run the demo
 
    .. code-block:: bash
 
-      # make sure you run pixi shell from mujoco_ros2_simulation
+      # make sure you run pixi shell from mujoco_ros2_control
       # cd to ros2_ws 
 
       ${MUJOCO_DIR}/bin/simulate src/ros-controls/ros2_control_demos/example_18/description/mujoco/scene.xml

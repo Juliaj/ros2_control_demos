@@ -443,9 +443,9 @@ bool is_zero_command =
   // physics engine: check_contact("foot_assembly", "floor") returns binary 1.0/0.0
   // MuJoCo automatically tracks these from collision detection.
   // 
-  // NOTE: Contact sensors are NOT currently implemented in mujoco_ros2_simulation.
+  // NOTE: Contact sensors are NOT currently implemented in mujoco_ros2_control.
   // The package only supports IMU, FTS (force/torque), cameras, and lidar sensors.
-  // To add contact sensors, mujoco_ros2_simulation would need to be extended to:
+  // To add contact sensors, mujoco_ros2_control would need to be extended to:
   //   1. Add contact sensor type in register_sensors() (similar to "fts" and "imu")
   //   2. Query mj_data->ncon and mj_data->contact[] in read() method
   //   3. Expose contact state interfaces through export_state_interfaces()
@@ -752,55 +752,56 @@ void MotionController::initialize_joint_limits()
 
     // Set limits based on joint name (matching ros2_control config)
     // Source: open_duck_mini.ros2_control.xacro
-    if (joint_name == "left_hip_yaw_joint" || joint_name == "right_hip_yaw_joint")
+    // Note: Joint names don't have "_joint" suffix in ros2_control config
+    if (joint_name == "left_hip_yaw" || joint_name == "right_hip_yaw")
     {
       joint_position_limits_min_[i] = -0.52359877559829881566;  // -30 degrees
       joint_position_limits_max_[i] = 0.52359877559829881566;   // +30 degrees
     }
-    else if (joint_name == "left_hip_roll_joint" || joint_name == "right_hip_roll_joint")
+    else if (joint_name == "left_hip_roll" || joint_name == "right_hip_roll")
     {
       joint_position_limits_min_[i] = -0.43633231299858238339;  // -25 degrees
       joint_position_limits_max_[i] = 0.43633231299858238339;   // +25 degrees
     }
-    else if (joint_name == "left_hip_pitch_joint")
+    else if (joint_name == "left_hip_pitch")
     {
       joint_position_limits_min_[i] = -1.2217304763960306069;  // -70 degrees
       joint_position_limits_max_[i] = 0.52359877559829881566;  // +30 degrees
     }
-    else if (joint_name == "right_hip_pitch_joint")
+    else if (joint_name == "right_hip_pitch")
     {
       joint_position_limits_min_[i] = -0.52359877559829881566;  // -30 degrees
       joint_position_limits_max_[i] = 1.2217304763960306069;    // +70 degrees
     }
-    else if (joint_name == "left_knee_joint" || joint_name == "right_knee_joint")
+    else if (joint_name == "left_knee" || joint_name == "right_knee")
     {
       joint_position_limits_min_[i] = -1.570796326794896558;  // -90 degrees
       joint_position_limits_max_[i] = 1.570796326794896558;   // +90 degrees
     }
-    else if (joint_name == "left_ankle_joint" || joint_name == "right_ankle_joint")
+    else if (joint_name == "left_ankle" || joint_name == "right_ankle")
     {
       joint_position_limits_min_[i] = -1.570796326794896558;  // -90 degrees
       joint_position_limits_max_[i] = 1.570796326794896558;   // +90 degrees
     }
-    else if (joint_name == "neck_pitch_joint")
+    else if (joint_name == "neck_pitch")
     {
-      joint_position_limits_min_[i] = -1.047197551196597746;  // -60 degrees
-      joint_position_limits_max_[i] = 1.047197551196597746;   // +60 degrees
+      joint_position_limits_min_[i] = -0.3490658503988437;  // ~-20 degrees
+      joint_position_limits_max_[i] = 1.1344640137963364;   // ~65 degrees
     }
-    else if (joint_name == "head_pitch_joint")
+    else if (joint_name == "head_pitch")
     {
       joint_position_limits_min_[i] = -0.785398163397448279;  // -45 degrees
       joint_position_limits_max_[i] = 0.785398163397448279;   // +45 degrees
     }
-    else if (joint_name == "head_yaw_joint")
+    else if (joint_name == "head_yaw")
     {
-      joint_position_limits_min_[i] = -1.570796326794896558;  // -90 degrees
-      joint_position_limits_max_[i] = 1.570796326794896558;   // +90 degrees
+      joint_position_limits_min_[i] = -2.792526803190927;  // ~-160 degrees
+      joint_position_limits_max_[i] = 2.792526803190927;   // ~+160 degrees
     }
-    else if (joint_name == "head_roll_joint")
+    else if (joint_name == "head_roll")
     {
-      joint_position_limits_min_[i] = -0.785398163397448279;  // -45 degrees
-      joint_position_limits_max_[i] = 0.785398163397448279;   // +45 degrees
+      joint_position_limits_min_[i] = -0.523598775598218;  // ~-30 degrees
+      joint_position_limits_max_[i] = 0.5235987755983796;   // ~+30 degrees
     }
     // For unknown joints, use no limits (already set to +/- infinity)
   }
@@ -1217,14 +1218,33 @@ void MotionController::validate_model_structure(size_t num_inputs, size_t num_ou
     }
   }
 
-  if (!has_dynamic_output && !output_shape_.empty() &&
-      output_shape_[0] != static_cast<int64_t>(joint_names_.size()))
+  if (!has_dynamic_output && !output_shape_.empty())
   {
-    RCLCPP_WARN(
-      get_node()->get_logger(),
-      "Model output size (%ld) does not match number of joints (%zu). "
-      "This may cause runtime errors if model outputs don't match joint count.",
-      output_shape_[0], joint_names_.size());
+    // For shapes like [1, 14] or [14], check the last dimension (joint dimension)
+    // For 1D shapes, last dimension is the only dimension
+    int64_t joint_dim = output_shape_.back();
+    
+    // Calculate total elements to handle cases where batch dimension might be present
+    int64_t total_elements = 1;
+    for (auto dim : output_shape_)
+    {
+      if (dim > 0)
+      {
+        total_elements *= dim;
+      }
+    }
+    
+    // Check if last dimension matches joint count, or if total elements match
+    // (for shapes like [1, 14], both should be 14)
+    if (joint_dim != static_cast<int64_t>(joint_names_.size()) &&
+        total_elements != static_cast<int64_t>(joint_names_.size()))
+    {
+      RCLCPP_WARN(
+        get_node()->get_logger(),
+        "Model output size (last dim: %ld, total elements: %ld) does not match number of joints (%zu). "
+        "This may cause runtime errors if model outputs don't match joint count.",
+        joint_dim, total_elements, joint_names_.size());
+    }
   }
   else if (has_dynamic_output)
   {

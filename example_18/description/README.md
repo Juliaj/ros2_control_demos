@@ -52,3 +52,4 @@ Configuration method:
 The `mujoco/robot.urdf` file provides a minimal URDF containing only the kinematic structure (links and joints) needed for `robot_state_publisher` to publish TF transforms. This URDF includes all 14 joints (10 leg + 4 head) with proper parent-child relationships. The actual robot model for simulation is loaded from the MuJoCo XML file via the `mujoco_model` parameter in the ros2_control configuration, while the URDF is used solely for TF transform computation.
 
 The method used is to extract joint names and parent-child relationships from `open_duck_mini_v2.xml`, joint limits from `open_duck_mini.ros2_control.xacro`, and approximate transform positions from MuJoCo body positions. Links include minimal placeholder inertials for URDF validity. Joint limits include required `effort` (3.23 N⋅m, matching PID u_clamp_max) and `velocity` (10.0 rad/s) attributes for URDF parser compliance.
+

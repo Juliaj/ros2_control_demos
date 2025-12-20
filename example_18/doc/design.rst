@@ -11,7 +11,7 @@ Architecture
 
 The system consists of two main components:
 
-1. interfaces_state_broadcaster: Aggregates hardware state interfaces into a control_msgs/Float64Values topic, including IMU data and joint states.
+1. state_interfaces_broadcaster: Aggregates hardware state interfaces into a control_msgs/Float64Values topic, including IMU data and joint states.
 
 2. LocomotionController: A ros2_control controller that subscribes to sensor data and velocity commands, formats observations, runs ONNX inference, and writes joint position commands to hardware.
 
@@ -22,7 +22,7 @@ Data Flow
 
    Hardware State Interfaces
        ↓
-   interfaces_state_broadcaster → control_msgs/Float64Values topic
+   state_interfaces_broadcaster → control_msgs/Float64Values topic
        ↓
    LocomotionController
        ↓ (ONNX inference)
@@ -35,7 +35,7 @@ Update Rate: 25 Hz
 
 Inputs:
 
-- Sensor data from interfaces_state_broadcaster/values topic:
+- Sensor data from state_interfaces_broadcaster/values topic:
   - Base angular velocity (from IMU)
   - Projected gravity vector (from IMU orientation)
   - Joint positions and velocities
@@ -104,7 +104,7 @@ Controller Manager
 ------------------
 
 - Runs control loop at 25 Hz
-- Manages lifecycle of interfaces_state_broadcaster and LocomotionController
+- Manages lifecycle of state_interfaces_broadcaster and LocomotionController
 
 User Command Interface
 ----------------------

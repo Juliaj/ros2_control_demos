@@ -86,7 +86,7 @@ def generate_launch_description():
         parameters=[robot_description],
     )
 
-    # Control node using controller_manager (not mujoco_ros2_simulation)
+    # Control node using controller_manager (not mujoco_ros2_control)
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",

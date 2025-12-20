@@ -22,7 +22,7 @@
     <ros2_control name="${name}" type="system">
       <xacro:unless value="${use_mock_hardware}">
         <hardware>
-          <plugin>mujoco_ros2_simulation/MujocoSystemInterface</plugin>
+          <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
           <param name="mujoco_model">$(find ros2_control_demo_example_18)/description/mujoco/scene.xml</param>
           <param name="meshdir">$(find ros2_control_demo_example_18)/description/assets</param>
           <param name="pids_config_file">$(find ros2_control_demo_example_18)/config/open_duck_mini_pids.yaml</param>
@@ -173,12 +173,14 @@
       </joint>
 
       <!-- IMU sensor - matches Playground sensor names -->
-      <!-- MuJoCo sensors must be named: {mujoco_sensor_name}_quat, {mujoco_sensor_name}_gyro, {mujoco_sensor_name}_accel -->
+      <!-- MuJoCo sensors: orientation (framequat), gyro, accelerometer -->
       <!-- For mock hardware, sensor interfaces are still available but will return default values -->
       <sensor name="${prefix}imu">
         <xacro:unless value="${use_mock_hardware}">
           <param name="mujoco_type">imu</param>
-          <param name="mujoco_sensor_name">imu</param>
+          <param name="mujoco_orientation_sensor">orientation</param>
+          <param name="mujoco_gyro_sensor">gyro</param>
+          <param name="mujoco_accel_sensor">accelerometer</param>
         </xacro:unless>
         <state_interface name="orientation.w"/>
         <state_interface name="orientation.x"/>
