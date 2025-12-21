@@ -53,3 +53,32 @@ The `mujoco/robot.urdf` file provides a minimal URDF containing only the kinemat
 
 The method used is to extract joint names and parent-child relationships from `open_duck_mini_v2.xml`, joint limits from `open_duck_mini.ros2_control.xacro`, and approximate transform positions from MuJoCo body positions. Links include minimal placeholder inertials for URDF validity. Joint limits include required `effort` (3.23 N⋅m, matching PID u_clamp_max) and `velocity` (10.0 rad/s) attributes for URDF parser compliance.
 
+### Command to Drive Mini Duck (WIP)
+
+Use the ROS2 topic /motion_controller/cmd_vel with the VelocityCommandWithHead message.
+
+Note, these commands will cause Duck to fall immediately. Cause is being investigated.
+
+# Launch demo
+
+ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py
+
+# Forward walk (0.15 m/s - trained velocity)
+ros2 topic pub /motion_controller/cmd_vel example_18_motion_controller_msgs/msg/VelocityCommandWithHead \
+  "{base_velocity: {linear: {x: 0.15, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}, head_commands: [0.0, 0.0, 0.0, 0.0]}" \
+  --rate 10
+
+# Turn left (1.0 rad/s)
+ros2 topic pub /motion_controller/cmd_vel example_18_motion_controller_msgs/msg/VelocityCommandWithHead \
+  "{base_velocity: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 1.0}}, head_commands: [0.0, 0.0, 0.0, 0.0]}" \
+  --rate 10
+
+# Stop
+ros2 topic pub /motion_controller/cmd_vel example_18_motion_controller_msgs/msg/VelocityCommandWithHead \
+  "{base_velocity: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}, head_commands: [0.0, 0.0, 0.0, 0.0]}" \
+  --rate 10
+
+Using Python Script:
+You can also use the existing test script:
+
+ros2 run ros2_control_demo_example_18 test_motions

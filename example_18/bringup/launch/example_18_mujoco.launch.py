@@ -89,7 +89,6 @@ def generate_launch_description():
         name="spawn_joint_state_broadcaster",
         arguments=[
             "joint_state_broadcaster",
-            "--inactive",
         ],
         output="both",
     )
@@ -100,18 +99,18 @@ def generate_launch_description():
         name="spawn_state_interfaces_broadcaster",
         arguments=[
             "state_interfaces_broadcaster",
-            "--inactive",
         ],
         output="both",
     )
 
+    # Spawn motion_controller (active by default)
+    # Controls robot joints using ONNX model inference
     spawn_motion_controller = Node(
         package="controller_manager",
         executable="spawner",
         name="spawn_motion_controller",
         arguments=[
             "motion_controller",
-            "--inactive",
         ],
         output="both",
     )

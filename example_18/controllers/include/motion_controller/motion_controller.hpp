@@ -134,6 +134,16 @@ private:
   std::vector<double> joint_position_limits_min_;
   std::vector<double> joint_position_limits_max_;
 
+  // Motor speed limits: prevent exceeding physical motor velocity capability
+  double max_motor_velocity_;  // rad/s (default: 5.24 from reference implementation)
+  std::vector<double> prev_motor_targets_;  // Previous joint commands for rate limiting
+  bool prev_motor_targets_initialized_;  // Track if prev_motor_targets_ has been set from actual positions
+  bool command_received_;  // Track if any velocity command has been received (to avoid moving before command)
+
+  // 1st attempt to tackle model stability
+  double reference_motion_blend_factor_;  // Weight for blending RL actions with reference motion (0.0-1.0)
+  std::vector<double> smoothed_reference_action_;  // Smoothed previous actions used as reference baseline
+
   // Open Duck Mini specific parameters
   double phase_frequency_factor_offset_;
 
