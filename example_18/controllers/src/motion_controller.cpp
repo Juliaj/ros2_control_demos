@@ -40,6 +40,8 @@ CallbackReturn MotionController::on_init()
     // Declare parameters
     get_node()->declare_parameter<std::vector<std::string>>("joints", std::vector<std::string>());
     get_node()->declare_parameter<std::string>("model_path", "");
+    get_node()->declare_parameter<int>("model_input_size", 0);
+    get_node()->declare_parameter<int>("model_output_size", 0);
     get_node()->declare_parameter<std::string>(
       "interfaces_broadcaster_topic", "state_interfaces_broadcaster/values");
     get_node()->declare_parameter<std::string>(
@@ -63,6 +65,7 @@ CallbackReturn MotionController::on_init()
     get_node()->declare_parameter<double>("cutoff_frequency", 0.0);
     get_node()->declare_parameter<double>("max_motor_velocity", 5.24);
     get_node()->declare_parameter<double>("reference_motion_blend_factor", 0.2);
+    get_node()->declare_parameter<double>("training_control_period", 0.02);
   }
   catch (const std::exception & e)
   {
@@ -126,6 +129,20 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
     return CallbackReturn::ERROR;
   }
 
+  // Read model input/output sizes for validation
+  model_input_size_ = static_cast<int>(get_node()->get_parameter("model_input_size").as_int());
+  model_output_size_ = static_cast<int>(get_node()->get_parameter("model_output_size").as_int());
+  if (model_input_size_ > 0)
+  {
+    RCLCPP_INFO(
+      get_node()->get_logger(), "Model input size (from config): %d", model_input_size_);
+  }
+  if (model_output_size_ > 0)
+  {
+    RCLCPP_INFO(
+      get_node()->get_logger(), "Model output size (from config): %d", model_output_size_);
+  }
+
   // Build command interface names: joint_name/position for each joint
   command_interface_names_.clear();
   for (const auto & joint_name : joint_names_)
@@ -137,38 +154,23 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
   // Initialize previous action to zeros
   previous_action_.resize(joint_names_.size(), 0.0);
 
-  // Initialize action quality monitoring
   update_count_ = 0;
-  total_clamps_ = 0;
-  joint_clamp_counts_.resize(joint_names_.size(), 0);
-  action_max_values_.resize(joint_names_.size(), -std::numeric_limits<double>::infinity());
-  action_min_values_.resize(joint_names_.size(), std::numeric_limits<double>::infinity());
-  previous_joint_commands_.resize(joint_names_.size(), 0.0);
-  total_action_change_ = 0.0;
-  extreme_action_count_ = 0;
 
   // Read IMU sensor name parameter
   std::string imu_sensor_name = get_node()->get_parameter("imu_sensor_name").as_string();
-  RCLCPP_INFO(get_node()->get_logger(), "IMU sensor name: %s", imu_sensor_name.c_str());
 
   // Read Open Duck Mini specific parameters
-  bool imu_upside_down = get_node()->get_parameter("imu_upside_down").as_bool();
+  (void)get_node()->get_parameter("imu_upside_down").as_bool();  // Parameter read but not used
   phase_frequency_factor_offset_ =
     get_node()->get_parameter("phase_frequency_factor_offset").as_double();
-  double phase_period = get_node()->get_parameter("phase_period").as_double();
-  RCLCPP_INFO(get_node()->get_logger(), "IMU upside down: %s", imu_upside_down ? "true" : "false");
-  RCLCPP_INFO(
-    get_node()->get_logger(), "Phase frequency factor offset: %.4f",
-    phase_frequency_factor_offset_);
-  RCLCPP_INFO(get_node()->get_logger(), "Phase period: %.1f steps", phase_period);
+  phase_period_ = get_node()->get_parameter("phase_period").as_double();
 
   // Initialize observation formatter
   observation_formatter_ = std::make_unique<ObservationFormatter>(joint_names_, imu_sensor_name);
-  observation_formatter_->set_phase_period(phase_period);
+  observation_formatter_->set_phase_period(phase_period_);
 
   // Read action_scale parameter
   double action_scale = get_node()->get_parameter("action_scale").as_double();
-  RCLCPP_INFO(get_node()->get_logger(), "Action scale: %.6f", action_scale);
 
   // Initialize action processor with configurable scale
   action_processor_ = std::make_unique<ActionProcessor>(joint_names_, action_scale, true);
@@ -182,12 +184,6 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
     head_joint_indices.push_back(static_cast<size_t>(idx));
   }
   action_processor_->set_head_joint_indices(head_joint_indices);
-  RCLCPP_INFO(
-    get_node()->get_logger(), "Head joint indices: [%zu, %zu, %zu, %zu]",
-    head_joint_indices.size() > 0 ? head_joint_indices[0] : 0,
-    head_joint_indices.size() > 1 ? head_joint_indices[1] : 0,
-    head_joint_indices.size() > 2 ? head_joint_indices[2] : 0,
-    head_joint_indices.size() > 3 ? head_joint_indices[3] : 0);
 
   // Read default_joint_positions parameter (optional)
   std::vector<double> param_default_positions =
@@ -201,51 +197,11 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
     default_joint_positions_ = param_default_positions;
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
-    // Note: prev_motor_targets_ will be initialized from actual joint positions on first update
-    RCLCPP_INFO(
-      get_node()->get_logger(), "Using default joint positions from parameters (%zu joints)",
-      default_joint_positions_.size());
-
-    // Log default positions for verification
-    std::stringstream pos_info;
-    pos_info << "Default joint positions: ";
-    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
-    {
-      if (i > 0) pos_info << ", ";
-      pos_info << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
-               << default_joint_positions_[i];
-    }
-    RCLCPP_INFO(get_node()->get_logger(), "%s", pos_info.str().c_str());
-
-    // Validate default positions are within reasonable bounds
-    bool positions_valid = true;
-    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
-    {
-      if (std::abs(default_joint_positions_[i]) > 3.14)
-      {
-        RCLCPP_WARN(
-          get_node()->get_logger(),
-          "Default position for joint '%s' (%.4f) exceeds reasonable bounds (±π)",
-          joint_names_[i].c_str(), default_joint_positions_[i]);
-        positions_valid = false;
-      }
-    }
-    if (positions_valid)
-    {
-      RCLCPP_INFO(
-        get_node()->get_logger(),
-        "Default joint positions validated: all within reasonable bounds");
-    }
   }
   else
   {
     // Will be set from sensor data on first update
     default_joint_positions_initialized_ = false;
-    RCLCPP_WARN(
-      get_node()->get_logger(),
-      "Default joint positions not provided (got %zu, expected %zu). "
-      "Will initialize from sensor data on first update - this may cause instability!",
-      param_default_positions.size(), joint_names_.size());
   }
 
   // Initialize joint position limits
@@ -273,31 +229,42 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
     RCLCPP_INFO(get_node()->get_logger(), "Using default joint limits from ros2_control config");
   }
 
-  // Log limits for debugging
-  for (size_t i = 0; i < joint_names_.size(); ++i)
-  {
-    RCLCPP_INFO(
-      get_node()->get_logger(), "Joint '%s' limits: [%.6f, %.6f]", joint_names_[i].c_str(),
-      joint_position_limits_min_[i], joint_position_limits_max_[i]);
-  }
-
   // Read motor speed limit parameter
   max_motor_velocity_ = get_node()->get_parameter("max_motor_velocity").as_double();
-  RCLCPP_INFO(
-    get_node()->get_logger(), "Max motor velocity: %.2f rad/s", max_motor_velocity_);
 
   // Read reference motion blend factor parameter
   reference_motion_blend_factor_ = get_node()->get_parameter("reference_motion_blend_factor").as_double();
   reference_motion_blend_factor_ = std::clamp(reference_motion_blend_factor_, 0.0, 1.0);
-  RCLCPP_INFO(
-    get_node()->get_logger(), "Reference motion blend factor: %.2f (%.0f%% reference, %.0f%% RL)",
-    reference_motion_blend_factor_,
-    reference_motion_blend_factor_ * 100.0,
-    (1.0 - reference_motion_blend_factor_) * 100.0);
 
-  // Initialize previous motor targets (will be set from actual joint positions on first update)
+  // Read training control period parameter
+  training_control_period_ = get_node()->get_parameter("training_control_period").as_double();
+  if (training_control_period_ <= 0.0)
+  {
+    RCLCPP_ERROR(
+      get_node()->get_logger(),
+      "Invalid training_control_period (%.6f). Must be positive. Using default 0.02s.",
+      training_control_period_);
+    training_control_period_ = 0.02;
+  }
+
+  // Initialize motor targets and previous motor targets to default_joint_positions
+  // Reference: validate_onnx_simulation.py lines 124-125: motor_targets = default_actuator, prev_motor_targets = default_actuator
+  motor_targets_.resize(joint_names_.size(), 0.0);
   prev_motor_targets_.resize(joint_names_.size(), 0.0);
-  prev_motor_targets_initialized_ = false;
+  if (default_joint_positions_initialized_)
+  {
+    // Initialize from default_joint_positions (same as default_actuator in reference)
+    motor_targets_ = default_joint_positions_;
+    prev_motor_targets_ = default_joint_positions_;
+    prev_motor_targets_initialized_ = true;
+    // Set initial motor targets in observation formatter
+    observation_formatter_->set_motor_targets(motor_targets_);
+  }
+  else
+  {
+    // Will be initialized from default_joint_positions on first update
+    prev_motor_targets_initialized_ = false;
+  }
   command_received_ = false;
   smoothed_reference_action_.resize(joint_names_.size(), 0.0);
 
@@ -325,12 +292,6 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
       velocity_command_topic_, rclcpp::SystemDefaultsQoS(),
       [this](const example_18_motion_controller_msgs::msg::VelocityCommandWithHead::SharedPtr msg)
       { rt_velocity_command_.set(*msg); });
-
-  // Log the topic name being subscribed to
-  // Note: ~/cmd_vel expands to /<node_namespace>/cmd_vel (e.g., /motion_controller/cmd_vel)
-  RCLCPP_INFO(
-    get_node()->get_logger(), "Subscribed to velocity command topic: %s (node namespace: %s)",
-    velocity_command_topic_.c_str(), get_node()->get_namespace());
 
   RCLCPP_INFO(get_node()->get_logger(), "Configure successful");
   return CallbackReturn::SUCCESS;
@@ -365,20 +326,10 @@ CallbackReturn MotionController::on_deactivate(const rclcpp_lifecycle::State & /
 return_type MotionController::update(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
 {
-  // Debug: Log that update is being called
-  static size_t update_call_count = 0;
-  update_call_count++;
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 1000,
-    "[DEBUG] Update called: count=%zu", update_call_count);
-
   // Get latest interface data from thread-safe buffer
   auto interface_data_op = rt_interface_data_.try_get();
   if (!interface_data_op.has_value())
   {
-    RCLCPP_INFO_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 1000,
-      "[DEBUG] No interface data available - returning early");
     return return_type::OK;
   }
   control_msgs::msg::Float64Values interface_data = interface_data_op.value();
@@ -386,32 +337,11 @@ return_type MotionController::update(
   // Get latest velocity command from thread-safe buffer
   auto velocity_cmd_op = rt_velocity_command_.try_get();
   example_18_motion_controller_msgs::msg::VelocityCommandWithHead velocity_cmd;
-  bool velocity_cmd_received = false;
   if (velocity_cmd_op.has_value())
   {
     velocity_cmd = velocity_cmd_op.value();
-    velocity_cmd_received = true;
-    
-    // Only mark as received if command is non-zero (user actually wants to move)
-    // Zero commands should not start control - robot should maintain initial pose
-    const double vel_tolerance = 1e-6;
-    bool is_non_zero = (std::abs(velocity_cmd.base_velocity.linear.x) >= vel_tolerance ||
-                        std::abs(velocity_cmd.base_velocity.linear.y) >= vel_tolerance ||
-                        std::abs(velocity_cmd.base_velocity.angular.z) >= vel_tolerance);
-    if (is_non_zero)
-    {
-      command_received_ = true;
-    }
+    command_received_ = true;
   }
-
-  // Debug: Log command reception status
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 1000,
-    "[DEBUG] Command received: %s, lin_x=%.4f, lin_y=%.4f, ang_z=%.4f",
-    velocity_cmd_received ? "YES" : "NO",
-    velocity_cmd.base_velocity.linear.x,
-    velocity_cmd.base_velocity.linear.y,
-    velocity_cmd.base_velocity.angular.z);
 
   // Format velocity commands for Open Duck Mini (7D: 3 base + 4 head)
   std::vector<double> velocity_commands_7d = {
@@ -424,46 +354,6 @@ return_type MotionController::update(
     velocity_cmd.head_commands.size() > 3 ? velocity_cmd.head_commands[3] : 0.0   // head_pos_4 (head_roll)
   };
   observation_formatter_->set_velocity_commands(velocity_commands_7d);
-
-  // Log observation inputs for debugging (throttled)
-  RCLCPP_DEBUG_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 3000,
-    "Observation inputs: vel_cmd=[%.3f, %.3f, %.3f], head=[%.3f, %.3f, %.3f, %.3f]",
-    velocity_commands_7d[0], velocity_commands_7d[1], velocity_commands_7d[2],
-    velocity_commands_7d[3], velocity_commands_7d[4], velocity_commands_7d[5], velocity_commands_7d[6]);
-
-  // Log velocity commands for debugging (throttled)
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 2000,
-    "Velocity command: lin_x=%.4f, lin_y=%.4f, ang_z=%.4f, head=[%.4f, %.4f, %.4f, %.4f] (received=%s)",
-    velocity_cmd.base_velocity.linear.x, velocity_cmd.base_velocity.linear.y,
-    velocity_cmd.base_velocity.angular.z,
-    velocity_commands_7d[3], velocity_commands_7d[4], velocity_commands_7d[5], velocity_commands_7d[6],
-    velocity_cmd_received ? "yes" : "no");
-// Check if velocity command is effectively zero (no movement command)
-const double vel_tolerance = 1e-6;
-bool is_zero_command =
-  !velocity_cmd_received || (std::abs(velocity_cmd.base_velocity.linear.x) < vel_tolerance &&
-                             std::abs(velocity_cmd.base_velocity.linear.y) < vel_tolerance &&
-                             std::abs(velocity_cmd.base_velocity.angular.z) < vel_tolerance);
-
-  // Debug: Log zero command check result
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 1000,
-    "[DEBUG] Zero command check: received=%s, is_zero=%s, tolerance=%.2e",
-    velocity_cmd_received ? "YES" : "NO",
-    is_zero_command ? "YES" : "NO",
-    vel_tolerance);
-
-
-    // Warn if no velocity command received (robot may not move as expected)
-  if (!velocity_cmd_received)
-  {
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 5000,
-      "No velocity command received - using default joint positions to maintain stable pose. "
-      "Send commands to /motion_controller/cmd_vel topic to control robot movement.");
-  }
 
   // Refresh interface name mapping when broadcaster publishes it
   if (auto names_op = rt_interface_names_.try_get(); names_op.has_value())
@@ -478,446 +368,216 @@ bool is_zero_command =
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
 
-    // Note: prev_motor_targets_ will be initialized from actual joint positions on first update
-
-    // Log initialized positions for verification
-    std::stringstream pos_info;
-    pos_info << "Initialized default joint positions from sensor data: ";
-    for (size_t i = 0; i < default_joint_positions_.size() && i < joint_names_.size(); ++i)
-    {
-      if (i > 0) pos_info << ", ";
-      pos_info << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
-               << default_joint_positions_[i];
-    }
-    RCLCPP_WARN(get_node()->get_logger(), "%s", pos_info.str().c_str());
-    RCLCPP_WARN(
-      get_node()->get_logger(),
-      "WARNING: Using sensor-initialized default positions may cause instability. "
-      "Consider setting default_joint_positions in config for stable operation.");
+    // Initialize motor_targets and prev_motor_targets to default_joint_positions
+    // Reference: validate_onnx_simulation.py lines 124-125
+    motor_targets_ = default_joint_positions_;
+    prev_motor_targets_ = default_joint_positions_;
+    prev_motor_targets_initialized_ = true;
+    observation_formatter_->set_motor_targets(motor_targets_);
   }
 
-  // Update imitation phase (gait phase encoding)
-  // Source: v2_rl_walk_mujoco.py lines 257-270
-  double phase_freq_factor = 1.0 + phase_frequency_factor_offset_;
-  observation_formatter_->update_imitation_phase(phase_freq_factor);
-
-  // Get feet contacts from MuJoCo simulation
-  // In MuJoCo training (Playground, mujoco_infer_base.py get_feet_contacts), contacts are queried from
-  // physics engine: check_contact("foot_assembly", "floor") returns binary 1.0/0.0
-  // MuJoCo automatically tracks these from collision detection.
-  // 
-  // NOTE: Contact sensors are NOT currently implemented in mujoco_ros2_control.
-  // The package only supports IMU, FTS (force/torque), cameras, and lidar sensors.
-  // To add contact sensors, mujoco_ros2_control would need to be extended to:
-  //   1. Add contact sensor type in register_sensors() (similar to "fts" and "imu")
-  //   2. Query mj_data->ncon and mj_data->contact[] in read() method
-  //   3. Expose contact state interfaces through export_state_interfaces()
-  //   4. Add sensor definition in ros2_control xacro with state interfaces
-  // 
-  // For now, estimate contacts from gait phase as temporary workaround.
-  // Since model was trained with binary contacts, we use binary values here:
-  // Alternating left/right based on gait phase sin component
-  auto phase = observation_formatter_->get_imitation_phase();  // [cos, sin]
-  double sin_phase = phase[1];  // sin component ranges -1 to 1
-  
-  // Binary contact switching based on phase
-  // When sin_phase > 0: left foot stance (1.0), right foot swing (0.0)
-  // When sin_phase < 0: right foot stance (1.0), left foot swing (0.0)
-  double left_contact = (sin_phase > 0.0) ? 1.0 : 0.0;
-  double right_contact = (sin_phase < 0.0) ? 1.0 : 0.0;
-  observation_formatter_->set_feet_contacts(left_contact, right_contact);
-  
-  // Log contact states and gait phase for debugging
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 2000,
-    "Gait phase: cos=%.3f, sin=%.3f (theta=%.1f°) | Foot contacts: L=%.0f, R=%.0f | Vel cmd: x=%.3f, y=%.3f, z=%.3f",
-    phase[0], sin_phase, std::atan2(sin_phase, phase[0]) * 180.0 / 3.14159,
-    left_contact, right_contact,
-    velocity_cmd.base_velocity.linear.x, velocity_cmd.base_velocity.linear.y, 
-    velocity_cmd.base_velocity.angular.z);
-
-  std::vector<double> model_outputs;
-  std::vector<double> joint_commands;
-
   // Don't send any commands until at least one velocity command has been received
-  // This keeps robot in its initial MuJoCo pose until user sends a command
   if (!command_received_)
   {
-    // Initialize prev_motor_targets_ from current positions for when commands start
-    if (!prev_motor_targets_initialized_)
+    if (!prev_motor_targets_initialized_ && default_joint_positions_initialized_)
     {
-      std::vector<double> current_positions =
-        observation_formatter_->extract_joint_positions(interface_data);
-      if (current_positions.size() == joint_names_.size())
-      {
-        prev_motor_targets_ = current_positions;
-        prev_motor_targets_initialized_ = true;
-        RCLCPP_INFO(
-          get_node()->get_logger(),
-          "Waiting for non-zero velocity command. Robot will maintain initial pose until command received.");
-      }
+      motor_targets_ = default_joint_positions_;
+      prev_motor_targets_ = default_joint_positions_;
+      prev_motor_targets_initialized_ = true;
+      observation_formatter_->set_motor_targets(motor_targets_);
     }
-    // Don't send any commands - return early to maintain current pose
     return return_type::OK;
   }
 
-  if (is_zero_command)  
+  // Update imitation phase (gait phase encoding)
+  // Reference: validate_onnx_simulation.py lines 137-144
+  const double actual_control_period = period.seconds();
+  if (std::abs(actual_control_period - training_control_period_) > 0.001)
   {
-    RCLCPP_INFO_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 1000,
-      "[DEBUG] Using zero command path: maintaining current position, joint_count=%zu",
-      joint_names_.size());
-
-    // When zero command received after control started, maintain current position
-    // This prevents robot from moving to default positions which may be unstable
-    std::vector<double> current_positions =
-      observation_formatter_->extract_joint_positions(interface_data);
-    
-    if (current_positions.size() == joint_names_.size())
-    {
-      joint_commands = current_positions;  // Maintain current, not default
-    }
-    else
-    {
-      // Fallback to defaults if current positions unavailable
-      joint_commands = default_joint_positions_;
-    }
-
-    // Model outputs are zero for relative positions when command is zero
-    model_outputs = std::vector<double>(joint_names_.size(), 0.0);
-
-    // Store motor targets for observation
-    observation_formatter_->set_motor_targets(joint_commands);
-
-    // Store zero action as previous for next iteration
-    previous_action_ = model_outputs;
-  }
-  else
-  {
-    // Debug: Log that model inference path is being used
-    RCLCPP_INFO_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 1000,
-      "[DEBUG] Using model inference path: vel_cmd=[%.4f, %.4f, %.4f]",
-      velocity_cmd.base_velocity.linear.x,
-      velocity_cmd.base_velocity.linear.y,
-      velocity_cmd.base_velocity.angular.z);
-    // Format inputs for model using ObservationFormatter
-    std::vector<float> model_inputs;
-    try
-    {
-      // Pass base_velocity to format() for API compatibility (not actually used, set_velocity_commands() is used instead)
-      model_inputs = observation_formatter_->format(interface_data, velocity_cmd.base_velocity, previous_action_);
-
-      // Debug: Log first 13 elements (gyro + accelero + commands) sent to model
-      if (model_inputs.size() >= 13)
-      {
-        RCLCPP_DEBUG_THROTTLE(
-          get_node()->get_logger(), *get_node()->get_clock(), 2000,
-          "Observation prefix: gyro=[%.4f,%.4f,%.4f], accel=[%.4f,%.4f,%.4f], "
-          "commands=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f]",
-          model_inputs[0], model_inputs[1], model_inputs[2], model_inputs[3], model_inputs[4],
-          model_inputs[5], model_inputs[6], model_inputs[7], model_inputs[8], model_inputs[9],
-          model_inputs[10], model_inputs[11], model_inputs[12]);
-      }
-    }
-    catch (const std::exception & e)
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 1000,
-        "Failed to format observation: %s", e.what());
-      return return_type::ERROR;
-    }
-
-    // Debug: Log observation dimensions
-    size_t expected_dim = observation_formatter_->get_observation_dim();
-    if (model_inputs.size() != expected_dim)
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 5000,
-        "Observation size mismatch: got %zu, expected %zu", model_inputs.size(), expected_dim);
-      return return_type::ERROR;
-    }
-
-    // Run model inference (returns relative joint positions, scaled by 0.25)
-    model_outputs = run_model_inference(model_inputs);
-
-    // Debug: Log model inference result
-    RCLCPP_INFO_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 1000,
-      "[DEBUG] Model inference: output_size=%zu, expected_joints=%zu",
-      model_outputs.size(), joint_names_.size());
-
-    // Debug: Log raw model outputs to diagnose action quality issues
-    RCLCPP_DEBUG_THROTTLE(
+    RCLCPP_WARN_THROTTLE(
       get_node()->get_logger(), *get_node()->get_clock(), 5000,
-      "Raw model outputs (before scaling): [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, "
-      "%.4f, %.4f, %.4f]",
-      model_outputs.size() > 0 ? model_outputs[0] : 0.0,
-      model_outputs.size() > 1 ? model_outputs[1] : 0.0,
-      model_outputs.size() > 2 ? model_outputs[2] : 0.0,
-      model_outputs.size() > 3 ? model_outputs[3] : 0.0,
-      model_outputs.size() > 4 ? model_outputs[4] : 0.0,
-      model_outputs.size() > 5 ? model_outputs[5] : 0.0,
-      model_outputs.size() > 6 ? model_outputs[6] : 0.0,
-      model_outputs.size() > 7 ? model_outputs[7] : 0.0,
-      model_outputs.size() > 8 ? model_outputs[8] : 0.0,
-      model_outputs.size() > 9 ? model_outputs[9] : 0.0,
-      model_outputs.size() > 10 ? model_outputs[10] : 0.0,
-      model_outputs.size() > 11 ? model_outputs[11] : 0.0);
+      "Controller update period (%.4f s) differs from training period (%.4f s). "
+      "Consider setting update_rate to %.1f Hz.",
+      actual_control_period, training_control_period_, 1.0 / training_control_period_);
+  }
+  double phase_freq_factor = 1.0 + phase_frequency_factor_offset_;
+  observation_formatter_->update_imitation_phase(phase_freq_factor);
 
-    // Process model outputs: apply scaling and default offset to get absolute positions
-    joint_commands = action_processor_->process(model_outputs, default_joint_positions_);
+  // Get feet contacts from real sensors if available, otherwise estimate from gait phase
+  double left_contact = 0.0;
+  double right_contact = 0.0;
+  bool sensors_available = observation_formatter_->extract_feet_contacts(
+    interface_data, left_contact, right_contact);
 
-    // Blend RL actions with reference motion for stability (Option 1)
-    // Reference motion provides stable baseline, RL adds learned corrections
-    if (reference_motion_blend_factor_ > 0.0 && update_count_ > 0)
-    {
-      // Use exponentially-smoothed previous actions as reference baseline
-      // This provides stability similar to polynomial reference motion
-      // TODO: Replace with full PolyReferenceMotion when C++ port is available
-      const double smoothing_alpha = 0.1;  // Exponential smoothing factor
-      for (size_t i = 0; i < joint_commands.size() && i < smoothed_reference_action_.size(); ++i)
-      {
-        // Update smoothed reference (exponential moving average of previous commands)
-        smoothed_reference_action_[i] = 
-          smoothing_alpha * joint_commands[i] + (1.0 - smoothing_alpha) * smoothed_reference_action_[i];
-        
-        // Blend: reference as baseline, RL as correction
-        joint_commands[i] = 
-          (1.0 - reference_motion_blend_factor_) * joint_commands[i] +
-          reference_motion_blend_factor_ * smoothed_reference_action_[i];
-      }
-    }
-    else if (update_count_ == 0)
-    {
-      // Initialize smoothed reference from first command
-      smoothed_reference_action_ = joint_commands;
-    }
+  if (!sensors_available)
+  {
+    // Fall back to phase-based estimation
+    auto phase = observation_formatter_->get_imitation_phase();
+    double sin_phase = phase[1];
+    left_contact = (sin_phase > 0.0) ? 1.0 : 0.0;
+    right_contact = (sin_phase < 0.0) ? 1.0 : 0.0;
+  }
 
-    // Debug: Log joint commands generated
-    RCLCPP_INFO_THROTTLE(
+  observation_formatter_->set_feet_contacts(left_contact, right_contact);
+
+  // Set motor_targets BEFORE building observation (reference: validate_onnx_simulation.py line 156)
+  observation_formatter_->set_motor_targets(motor_targets_);
+
+  // Format inputs for model using ObservationFormatter
+  std::vector<float> model_inputs;
+  try
+  {
+    model_inputs = observation_formatter_->format(interface_data, velocity_cmd.base_velocity, previous_action_);
+  }
+  catch (const std::exception & e)
+  {
+    RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *get_node()->get_clock(), 1000,
-      "[DEBUG] Joint commands generated: count=%zu, first_cmd=%.4f, last_cmd=%.4f, blend=%.2f",
-      joint_commands.size(),
-      joint_commands.size() > 0 ? joint_commands[0] : 0.0,
-      joint_commands.size() > 0 ? joint_commands[joint_commands.size() - 1] : 0.0,
-      reference_motion_blend_factor_);
-
-    // Store motor targets for observation (before applying head commands)
-    observation_formatter_->set_motor_targets(joint_commands);
-
-    // Store current action as previous for next iteration (use raw model outputs, not processed)
-    previous_action_ = model_outputs;
+      "Failed to format observation: %s", e.what());
+    return return_type::ERROR;
   }
 
-  // Debug: Log all joint commands before clamping (compact format)
-  std::stringstream debug_before;
-  debug_before << "Joint commands (before clamping): ";
-  for (size_t i = 0; i < joint_commands.size() && i < joint_names_.size(); ++i)
+  size_t expected_dim = observation_formatter_->get_observation_dim();
+  if (model_inputs.size() != expected_dim)
   {
-    if (i > 0) debug_before << ", ";
-    debug_before << joint_names_[i] << "=" << std::fixed << std::setprecision(4)
-                 << joint_commands[i];
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 5000,
+      "Observation size mismatch: got %zu, expected %zu", model_inputs.size(), expected_dim);
+    return return_type::ERROR;
   }
-  RCLCPP_DEBUG_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 2000, "%s", debug_before.str().c_str());
 
-  // Info: Log action history [last-3, last-2, last-1, current] for debugging (throttled)
-  auto last_action = observation_formatter_->get_last_action();
-  auto last_last_action = observation_formatter_->get_last_last_action();
-  auto last_last_last_action = observation_formatter_->get_last_last_last_action();
-  
-  std::stringstream info_summary;
-  info_summary << "Action history [last-3, last-2, last-1, current]:\n";
-  
-  // Print each joint's 4-step history on one line
-  for (size_t i = 0; i < joint_commands.size() && i < joint_names_.size(); ++i)
+  // Log full observation breakdown matching compare_observations.py format
+  // Reference: compare_observations.py lines 36-47
+  // Note: Logging every update (not throttled) to match Python behavior
+  if (model_inputs.size() >= 101)
   {
-    info_summary << "  " << joint_names_[i] << ": [";
-    
-    // Last-3
-    if (!last_last_last_action.empty() && i < last_last_last_action.size())
-      info_summary << std::fixed << std::setprecision(4) << last_last_last_action[i];
-    else
-      info_summary << "----";
-    info_summary << ", ";
-    
-    // Last-2
-    if (!last_last_action.empty() && i < last_last_action.size())
-      info_summary << std::fixed << std::setprecision(4) << last_last_action[i];
-    else
-      info_summary << "----";
-    info_summary << ", ";
-    
-    // Last-1
-    if (!last_action.empty() && i < last_action.size())
-      info_summary << std::fixed << std::setprecision(4) << last_action[i];
-    else
-      info_summary << "----";
-    info_summary << ", ";
-    
-    // Current
-    info_summary << std::fixed << std::setprecision(4) << joint_commands[i];
-    info_summary << "]\n";
+    auto phase = observation_formatter_->get_imitation_phase();
+    double imitation_i = observation_formatter_->get_imitation_i();
+    double phase_period = observation_formatter_->get_phase_period();
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "\n[ROS2 OBS] Full observation (101 dims):\n"
+      "  gyro=[%.4f,%.4f,%.4f]\n"
+      "  accel=[%.4f,%.4f,%.4f] (x+1.3=%.4f)\n"
+      "  command=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f]\n"
+      "  joint_pos_rel[0:3]=[%.4f,%.4f,%.4f,%.4f] (left_hip)\n"
+      "  joint_vel[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
+      "  last_action[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
+      "  motor_targets[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
+      "  contacts=[%.4f,%.4f]\n"
+      "  phase=[%.4f,%.4f]\n"
+      "  imitation_i=%.1f, phase_period=%.1f",
+      model_inputs[0], model_inputs[1], model_inputs[2],  // gyro
+      model_inputs[3], model_inputs[4], model_inputs[5], model_inputs[3],  // accel (x should have +1.3)
+      model_inputs[6], model_inputs[7], model_inputs[8], model_inputs[9], model_inputs[10], model_inputs[11], model_inputs[12],  // commands
+      model_inputs[13], model_inputs[14], model_inputs[15], model_inputs[16],  // joint_pos_rel (left_hip_yaw,roll,pitch,knee)
+      model_inputs[27], model_inputs[28], model_inputs[29], model_inputs[30],  // joint_vel
+      model_inputs[41], model_inputs[42], model_inputs[43], model_inputs[44],  // last_action
+      model_inputs[69], model_inputs[70], model_inputs[71], model_inputs[72],  // motor_targets
+      model_inputs[83], model_inputs[84],  // contacts
+      model_inputs[85], model_inputs[86],  // phase
+      imitation_i, phase_period);
   }
-  
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 5000, "%s", info_summary.str().c_str());
 
-  // Track action quality metrics
-  size_t num_clamped = 0;
-  double total_change = 0.0;
+  // Run model inference (returns relative joint positions)
+  std::vector<double> model_outputs = run_model_inference(model_inputs);
+
+  // Process model outputs: apply scaling and default offset to get absolute positions
+  std::vector<double> joint_commands = action_processor_->process(model_outputs, default_joint_positions_);
+
+  // Blend RL actions with reference motion for stability
+  if (reference_motion_blend_factor_ > 0.0 && update_count_ > 0)
+  {
+    const double smoothing_alpha = 0.1;
+    for (size_t i = 0; i < joint_commands.size() && i < smoothed_reference_action_.size(); ++i)
+    {
+      smoothed_reference_action_[i] = 
+        smoothing_alpha * joint_commands[i] + (1.0 - smoothing_alpha) * smoothed_reference_action_[i];
+      joint_commands[i] = 
+        (1.0 - reference_motion_blend_factor_) * joint_commands[i] +
+        reference_motion_blend_factor_ * smoothed_reference_action_[i];
+    }
+  }
+  else if (update_count_ == 0)
+  {
+    smoothed_reference_action_ = joint_commands;
+  }
+
+  // Store current action as previous for next iteration
+  previous_action_ = model_outputs;
 
   // Apply motor speed limits: prevent exceeding physical motor velocity capability
-  // Reference: mujoco_infer.py lines 216-227
-  // Limits rate of change to max_motor_velocity (rad/s) per control period
+  // Reference: validate_onnx_simulation.py lines 221-226
   if (prev_motor_targets_initialized_)
   {
-    const double dt = period.seconds();  // Control period (e.g., 0.02s at 50Hz)
-    const double max_change = max_motor_velocity_ * dt;  // Max change per step
+    const double max_change = max_motor_velocity_ * actual_control_period;
+    
     for (size_t i = 0; i < joint_commands.size(); ++i)
     {
       // Clamp joint command to prevent exceeding motor velocity limit
       joint_commands[i] = std::clamp(
         joint_commands[i],
-        prev_motor_targets_[i] - max_change,  // Can't decrease too fast
-        prev_motor_targets_[i] + max_change    // Can't increase too fast
+        prev_motor_targets_[i] - max_change,
+        prev_motor_targets_[i] + max_change
       );
     }
   }
-  // Store current commands as previous for next iteration
+  
+  // Update motor_targets and prev_motor_targets after clamping
+  // Reference: validate_onnx_simulation.py line 226: prev_motor_targets = motor_targets.copy()
+  motor_targets_ = joint_commands;
   prev_motor_targets_ = joint_commands;
 
-  // Write joint commands to hardware interfaces (with clamping to limits)
-  // TODO(juliaj): Consider querying limits from command interface at runtime instead of using
-  // hardcoded values. This would ensure limits match what MuJoCo/hardware actually enforces.
+  // Log step-by-step information every 25 updates (matching compare_observations.py line 83)
+  // Reference: compare_observations.py lines 84-88
+  if (update_count_ % 25 == 0)
+  {
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "\n[STEP %zu] Policy update #%zu\n"
+      "  Command: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n"
+      "  Action[0:3]: %.4f, %.4f, %.4f, %.4f\n"
+      "  Motor targets[0:3]: %.4f, %.4f, %.4f, %.4f",
+      update_count_ + 1, update_count_ + 1,
+      velocity_commands_7d[0], velocity_commands_7d[1], velocity_commands_7d[2],
+      velocity_commands_7d[3], velocity_commands_7d[4], velocity_commands_7d[5], velocity_commands_7d[6],
+      model_outputs.size() > 0 ? model_outputs[0] : 0.0,
+      model_outputs.size() > 1 ? model_outputs[1] : 0.0,
+      model_outputs.size() > 2 ? model_outputs[2] : 0.0,
+      model_outputs.size() > 3 ? model_outputs[3] : 0.0,
+      motor_targets_.size() > 0 ? motor_targets_[0] : 0.0,
+      motor_targets_.size() > 1 ? motor_targets_[1] : 0.0,
+      motor_targets_.size() > 2 ? motor_targets_[2] : 0.0,
+      motor_targets_.size() > 3 ? motor_targets_[3] : 0.0);
+  }
+
+  // Write joint commands to hardware interfaces
+  // Reference: validate_onnx_simulation.py line 228/273: self.data.ctrl = self.motor_targets.copy()
+  // Note: Python reference does not apply joint position limits, only motor velocity limits
   for (size_t i = 0; i < command_interfaces_.size() && i < joint_commands.size(); ++i)
   {
-    // Track action statistics
-    action_max_values_[i] = std::max(action_max_values_[i], joint_commands[i]);
-    action_min_values_[i] = std::min(action_min_values_[i], joint_commands[i]);
-
-    // Track action smoothness (rate of change)
-    if (update_count_ > 0)
-    {
-      double change = std::abs(joint_commands[i] - previous_joint_commands_[i]);
-      total_change += change;
-
-      // Flag large action changes (>0.3 rad in one step) - potential cause of instability
-      if (change > 0.3)
-      {
-        RCLCPP_WARN_THROTTLE(
-          get_node()->get_logger(), *get_node()->get_clock(), 500,
-          "LARGE ACTION CHANGE: Joint '%s' changed by %.4f rad (from %.4f to %.4f) - "
-          "may cause instability!",
-          joint_names_[i].c_str(), change, previous_joint_commands_[i], joint_commands[i]);
-      }
-    }
-
-    // Check if hip/ankle joints exceed 50% of limit range (critical for stability)
-    const std::string & joint_name = joint_names_[i];
-    bool is_hip_or_ankle = (joint_name.find("hip") != std::string::npos) ||
-                           (joint_name.find("ankle") != std::string::npos);
-    if (is_hip_or_ankle)
-    {
-      double limit_range = joint_position_limits_max_[i] - joint_position_limits_min_[i];
-      if (limit_range > 1e-6)  // Avoid division by zero
-      {
-        double position_in_range =
-          (joint_commands[i] - joint_position_limits_min_[i]) / limit_range;
-        // Flag if command is beyond 50% of range (either >75% or <25%)
-        if (position_in_range > 0.75 || position_in_range < 0.25)
-        {
-          RCLCPP_WARN_THROTTLE(
-            get_node()->get_logger(), *get_node()->get_clock(), 500,
-            "HIP/ANKLE NEAR LIMIT: Joint '%s' at %.4f (%.1f%% of range [%.4f, %.4f]) - "
-            "may cause instability!",
-            joint_names_[i].c_str(), joint_commands[i], position_in_range * 100.0,
-            joint_position_limits_min_[i], joint_position_limits_max_[i]);
-        }
-      }
-    }
-
-    // Clamp command to joint limits
-    double clamped_command =
-      std::clamp(joint_commands[i], joint_position_limits_min_[i], joint_position_limits_max_[i]);
-
-    if (clamped_command != joint_commands[i])
-    {
-      num_clamped++;
-      joint_clamp_counts_[i]++;
-      RCLCPP_WARN_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 1000,
-        "Joint '%s' command clamped from %.6f to %.6f (limits: [%.6f, %.6f])",
-        joint_names_[i].c_str(), joint_commands[i], clamped_command, joint_position_limits_min_[i],
-        joint_position_limits_max_[i]);
-    }
-
-    // Detect extreme actions (beyond reasonable bounds)
-    if (std::abs(joint_commands[i]) > 3.0)
-    {
-      extreme_action_count_++;
-    }
-
-    // Additional safety check: if command is still out of reasonable bounds, log error
-    if (std::abs(clamped_command) > 3.14)  // Warn if command exceeds ±π
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 1000,
-        "Joint '%s' command %.6f exceeds reasonable bounds (limits: [%.6f, %.6f])",
-        joint_names_[i].c_str(), clamped_command, joint_position_limits_min_[i],
-        joint_position_limits_max_[i]);
-    }
-
-    const bool write_success = command_interfaces_[i].set_value(clamped_command);
+    const bool write_success = command_interfaces_[i].set_value(joint_commands[i]);
     if (!write_success)
     {
       RCLCPP_WARN_THROTTLE(
         get_node()->get_logger(), *get_node()->get_clock(), 1000,
-        "Failed to set command for joint '%s' to %.6f (limits: [%.6f, %.6f])",
-        joint_names_[i].c_str(), clamped_command, joint_position_limits_min_[i],
-        joint_position_limits_max_[i]);
+        "Failed to set command for joint '%s' to %.6f",
+        joint_names_[i].c_str(), joint_commands[i]);
     }
   }
 
-  // Debug: Log summary of commands sent to hardware
-  RCLCPP_INFO_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 1000,
-    "[DEBUG] Commands sent to hardware: interfaces=%zu, clamped=%zu, path=%s",
-    command_interfaces_.size(), num_clamped,
-    is_zero_command ? "zero_cmd" : "model_inference");
-
-  // Debug: Log all joint commands after clamping (compact format)
-  std::stringstream debug_after;
-  debug_after << "Joint commands (after clamping): ";
-  for (size_t i = 0; i < command_interfaces_.size() && i < joint_commands.size(); ++i)
-  {
-    if (i > 0) debug_after << ", ";
-    double clamped_cmd =
-      std::clamp(joint_commands[i], joint_position_limits_min_[i], joint_position_limits_max_[i]);
-    debug_after << joint_names_[i] << "=" << std::fixed << std::setprecision(4) << clamped_cmd;
-    if (clamped_cmd != joint_commands[i])
-    {
-      debug_after << "(clamped)";
-    }
-  }
-  RCLCPP_DEBUG_THROTTLE(
-    get_node()->get_logger(), *get_node()->get_clock(), 2000, "%s", debug_after.str().c_str());
-
-  // Update action quality metrics
   update_count_++;
-  total_clamps_ += num_clamped;
-  total_action_change_ += total_change;
-  previous_joint_commands_ = joint_commands;
-
-  // Report action quality statistics periodically
-  report_action_quality(joint_commands, num_clamped);
 
   return return_type::OK;
 }
 
 void MotionController::initialize_joint_limits()
 {
+  // POTENTIAL DEAD CODE: This function is not used since we removed joint position limit clamping
+  // to match Python reference behavior (validate_onnx_simulation.py does not apply joint limits).
+  // The Python script only applies motor velocity limits, not joint position limits.
+  // This function can be removed if joint limits are not needed for safety/hardware protection.
+  //
   // Initialize joint limits based on ros2_control config values
   // These match the limits defined in open_duck_mini.ros2_control.xacro
   for (size_t i = 0; i < joint_names_.size(); ++i)
@@ -981,95 +641,6 @@ void MotionController::initialize_joint_limits()
   }
 }
 
-void MotionController::report_action_quality(
-  const std::vector<double> & /* joint_commands */, size_t /* num_clamped */)
-{
-  // Report statistics every 100 updates (~4 seconds at 25Hz)
-  if (update_count_ % 100 == 0 && update_count_ > 0)
-  {
-    double clamp_rate =
-      (100.0 * static_cast<double>(total_clamps_)) /
-      (static_cast<double>(update_count_) * static_cast<double>(joint_names_.size()));
-    double avg_action_change = total_action_change_ / static_cast<double>(update_count_ - 1);
-    double extreme_rate =
-      (100.0 * static_cast<double>(extreme_action_count_)) /
-      (static_cast<double>(update_count_) * static_cast<double>(joint_names_.size()));
-
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 10000,
-      "=== Action Quality Report (after %zu updates) ===", update_count_);
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 10000,
-      "Clamping: %.2f%% of commands clamped (total: %zu)", clamp_rate, total_clamps_);
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 10000,
-      "Action smoothness: avg change per step = %.6f rad", avg_action_change);
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 10000,
-      "Extreme actions (>3.0 rad): %.2f%%", extreme_rate);
-
-    // Report most frequently clamped joints
-    std::vector<std::pair<size_t, size_t>> clamp_ranking;
-    for (size_t i = 0; i < joint_clamp_counts_.size(); ++i)
-    {
-      if (joint_clamp_counts_[i] > 0)
-      {
-        clamp_ranking.push_back({i, joint_clamp_counts_[i]});
-      }
-    }
-    std::sort(
-      clamp_ranking.begin(), clamp_ranking.end(),
-      [](const auto & a, const auto & b) { return a.second > b.second; });
-
-    if (!clamp_ranking.empty())
-    {
-      std::stringstream clamp_info;
-      clamp_info << "Most clamped joints: ";
-      for (size_t i = 0; i < std::min(clamp_ranking.size(), size_t(5)); ++i)
-      {
-        if (i > 0) clamp_info << ", ";
-        clamp_info << joint_names_[clamp_ranking[i].first] << "(" << clamp_ranking[i].second
-                   << "x)";
-      }
-      RCLCPP_WARN_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 10000, "%s", clamp_info.str().c_str());
-    }
-
-    // Report action ranges
-    std::stringstream range_info;
-    range_info << "Action ranges: ";
-    for (size_t i = 0; i < std::min(joint_names_.size(), size_t(6)); ++i)
-    {
-      if (i > 0) range_info << ", ";
-      range_info << joint_names_[i] << "[" << std::fixed << std::setprecision(3)
-                 << action_min_values_[i] << "," << action_max_values_[i] << "]";
-    }
-    RCLCPP_WARN_THROTTLE(
-      get_node()->get_logger(), *get_node()->get_clock(), 10000, "%s", range_info.str().c_str());
-
-    // Check for problematic patterns
-    if (clamp_rate > 20.0)
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 10000,
-        "WARNING: High clamping rate (%.2f%%) - actions frequently exceed limits!", clamp_rate);
-    }
-    if (avg_action_change > 0.5)
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 10000,
-        "WARNING: High action change rate (%.6f rad/step) - actions may be unstable!",
-        avg_action_change);
-    }
-    if (extreme_rate > 5.0)
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_node()->get_logger(), *get_node()->get_clock(), 10000,
-        "WARNING: High extreme action rate (%.2f%%) - model may be producing invalid outputs!",
-        extreme_rate);
-    }
-  }
-}
 
 bool MotionController::load_model(const std::string & model_path)
 {
@@ -1089,13 +660,39 @@ bool MotionController::load_model(const std::string & model_path)
     // Create session from model file
     onnx_session_ = std::make_unique<Ort::Session>(*onnx_env_, model_path.c_str(), session_options);
 
-    // Extract and log model metadata
+    // Extract model metadata
     Ort::AllocatorWithDefaultOptions allocator;
     size_t num_inputs = onnx_session_->GetInputCount();
     size_t num_outputs = onnx_session_->GetOutputCount();
 
-    log_input_metadata(*onnx_session_, allocator);
-    log_output_metadata(*onnx_session_, allocator);
+    // Extract input names and shape
+    input_names_.clear();
+    for (size_t i = 0; i < num_inputs; ++i)
+    {
+      auto input_name = onnx_session_->GetInputNameAllocated(i, allocator);
+      input_names_.push_back(std::string(input_name.get()));
+      if (i == 0)
+      {
+        auto input_type_info = onnx_session_->GetInputTypeInfo(i);
+        auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
+        input_shape_ = input_tensor_info.GetShape();
+      }
+    }
+
+    // Extract output names and shape
+    output_names_.clear();
+    for (size_t i = 0; i < num_outputs; ++i)
+    {
+      auto output_name = onnx_session_->GetOutputNameAllocated(i, allocator);
+      output_names_.push_back(std::string(output_name.get()));
+      if (i == 0)
+      {
+        auto output_type_info = onnx_session_->GetOutputTypeInfo(i);
+        auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
+        output_shape_ = output_tensor_info.GetShape();
+      }
+    }
+
     validate_model_structure(num_inputs, num_outputs);
 
     // Create pointer arrays from stored strings
@@ -1242,73 +839,6 @@ const char * MotionController::get_onnx_type_name(ONNXTensorElementDataType type
   }
 }
 
-void MotionController::log_input_metadata(
-  Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator)
-{
-  size_t num_inputs = session.GetInputCount();
-  RCLCPP_INFO(get_node()->get_logger(), "=== ONNX Model Input Metadata ===");
-  RCLCPP_INFO(get_node()->get_logger(), "Number of inputs: %zu", num_inputs);
-
-  input_names_.clear();
-  for (size_t i = 0; i < num_inputs; ++i)
-  {
-    auto input_name = session.GetInputNameAllocated(i, allocator);
-    std::string input_name_str(input_name.get());
-    input_names_.push_back(input_name_str);
-
-    auto input_type_info = session.GetInputTypeInfo(i);
-    auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
-    ONNXTensorElementDataType input_type = input_tensor_info.GetElementType();
-    std::vector<int64_t> input_shape = input_tensor_info.GetShape();
-
-    std::string shape_str = format_shape_string(input_shape);
-    const char * type_name = get_onnx_type_name(input_type);
-
-    RCLCPP_INFO(
-      get_node()->get_logger(), "  Input[%zu]: name='%s', shape=%s, type=%s", i,
-      input_name_str.c_str(), shape_str.c_str(), type_name);
-
-    // Store first input shape for validation
-    if (i == 0)
-    {
-      input_shape_ = input_shape;
-    }
-  }
-}
-
-void MotionController::log_output_metadata(
-  Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator)
-{
-  size_t num_outputs = session.GetOutputCount();
-  RCLCPP_INFO(get_node()->get_logger(), "=== ONNX Model Output Metadata ===");
-  RCLCPP_INFO(get_node()->get_logger(), "Number of outputs: %zu", num_outputs);
-
-  output_names_.clear();
-  for (size_t i = 0; i < num_outputs; ++i)
-  {
-    auto output_name = session.GetOutputNameAllocated(i, allocator);
-    std::string output_name_str(output_name.get());
-    output_names_.push_back(output_name_str);
-
-    auto output_type_info = session.GetOutputTypeInfo(i);
-    auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
-    ONNXTensorElementDataType output_type = output_tensor_info.GetElementType();
-    std::vector<int64_t> output_shape = output_tensor_info.GetShape();
-
-    std::string shape_str = format_shape_string(output_shape);
-    const char * type_name = get_onnx_type_name(output_type);
-
-    RCLCPP_INFO(
-      get_node()->get_logger(), "  Output[%zu]: name='%s', shape=%s, type=%s", i,
-      output_name_str.c_str(), shape_str.c_str(), type_name);
-
-    // Store first output shape for validation
-    if (i == 0)
-    {
-      output_shape_ = output_shape;
-    }
-  }
-}
 
 void MotionController::validate_model_structure(size_t num_inputs, size_t num_outputs)
 {
@@ -1378,6 +908,34 @@ void MotionController::validate_model_structure(size_t num_inputs, size_t num_ou
       joint_names_.size(), joint_names_.size(), expected_input_size);
   }
 
+  // Validate against config values if provided
+  if (model_input_size_ > 0)
+  {
+    if (static_cast<size_t>(model_input_size_) != expected_input_size)
+    {
+      RCLCPP_WARN(
+        get_node()->get_logger(),
+        "Config model_input_size (%d) does not match calculated observation dimension (%zu). "
+        "Using calculated value.",
+        model_input_size_, expected_input_size);
+    }
+    else if (!has_dynamic_dim && static_cast<size_t>(model_input_size_) != model_input_size)
+    {
+      RCLCPP_WARN(
+        get_node()->get_logger(),
+        "Config model_input_size (%d) does not match ONNX model input size (%zu). "
+        "ONNX model shape takes precedence.",
+        model_input_size_, model_input_size);
+    }
+    else
+    {
+      RCLCPP_INFO(
+        get_node()->get_logger(),
+        "Config model_input_size (%d) matches calculated observation dimension (%zu)",
+        model_input_size_, expected_input_size);
+    }
+  }
+
   // Check model output size - allow dynamic dimensions (-1) which will be validated at runtime
   bool has_dynamic_output = false;
   if (!output_shape_.empty())
@@ -1419,12 +977,61 @@ void MotionController::validate_model_structure(size_t num_inputs, size_t num_ou
         "This may cause runtime errors if model outputs don't match joint count.",
         joint_dim, total_elements, joint_names_.size());
     }
+    
+    // Validate against config value if provided
+    if (model_output_size_ > 0)
+    {
+      if (static_cast<size_t>(model_output_size_) != joint_names_.size())
+      {
+        RCLCPP_WARN(
+          get_node()->get_logger(),
+          "Config model_output_size (%d) does not match number of joints (%zu). "
+          "Using actual joint count.",
+          model_output_size_, joint_names_.size());
+      }
+      else if (joint_dim != static_cast<int64_t>(model_output_size_) &&
+               total_elements != static_cast<int64_t>(model_output_size_))
+      {
+        RCLCPP_WARN(
+          get_node()->get_logger(),
+          "Config model_output_size (%d) does not match ONNX model output size "
+          "(last dim: %ld, total elements: %ld). ONNX model shape takes precedence.",
+          model_output_size_, joint_dim, total_elements);
+      }
+      else
+      {
+        RCLCPP_INFO(
+          get_node()->get_logger(),
+          "Config model_output_size (%d) matches number of joints (%zu) and ONNX model output",
+          model_output_size_, joint_names_.size());
+      }
+    }
   }
   else if (has_dynamic_output)
   {
     RCLCPP_INFO(
       get_node()->get_logger(),
       "Model has dynamic output dimensions - will validate actual output size at runtime");
+    
+    // Validate against config value if provided (for dynamic outputs)
+    if (model_output_size_ > 0)
+    {
+      if (static_cast<size_t>(model_output_size_) != joint_names_.size())
+      {
+        RCLCPP_WARN(
+          get_node()->get_logger(),
+          "Config model_output_size (%d) does not match number of joints (%zu). "
+          "Will validate at runtime.",
+          model_output_size_, joint_names_.size());
+      }
+      else
+      {
+        RCLCPP_INFO(
+          get_node()->get_logger(),
+          "Config model_output_size (%d) matches number of joints (%zu) - will validate at runtime",
+          model_output_size_, joint_names_.size());
+      }
+    }
   }
 }
 #endif

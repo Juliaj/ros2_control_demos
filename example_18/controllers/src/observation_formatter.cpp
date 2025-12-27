@@ -20,6 +20,7 @@
 #include <cmath>
 #include <string>
 
+#include "rclcpp/clock.hpp"
 #include "rclcpp/logging.hpp"
 
 namespace motion_controller
@@ -34,6 +35,9 @@ ObservationFormatter::ObservationFormatter(
   default_joint_velocities_(num_joints_, 0.0),
   default_joint_velocities_set_(false),
   imu_sensor_name_(imu_sensor_name),
+  left_foot_contact_sensor_name_("left_foot_contact"),
+  right_foot_contact_sensor_name_("right_foot_contact"),
+  contact_force_threshold_(5.0),  // 5N threshold for contact detection from FTS
   previous_joint_positions_(num_joints_, 0.0),
   previous_joint_velocities_(num_joints_, 0.0),
   previous_states_initialized_(false),
@@ -301,19 +305,16 @@ void ObservationFormatter::extract_interface_data(
     }
   }
 
-  // Debug: Log IMU data extraction status (throttled using static counter)
-  static size_t debug_counter = 0;
-  if (++debug_counter % 50 == 0)  // Log every 50 calls (~2 seconds at 25Hz)
-  {
-    RCLCPP_INFO(
-      logger,
-      "IMU data extraction: gyro_found=[%s, %s, %s], accel_found=[%s, %s, %s], "
-      "gyro=[%.4f, %.4f, %.4f], accel=[%.4f, %.4f, %.4f]",
-      imu_gyro_found[0] ? "yes" : "no", imu_gyro_found[1] ? "yes" : "no",
-      imu_gyro_found[2] ? "yes" : "no", imu_accel_found[0] ? "yes" : "no",
-      imu_accel_found[1] ? "yes" : "no", imu_accel_found[2] ? "yes" : "no", gyro[0], gyro[1],
-      gyro[2], accelero[0], accelero[1], accelero[2]);
-  }
+  // Debug: Log IMU data extraction status (throttled)
+  static rclcpp::Clock clock;
+  RCLCPP_DEBUG_THROTTLE(
+    logger, clock, 5000,  // Log at most once every 5 seconds
+    "IMU data extraction: gyro_found=[%s, %s, %s], accel_found=[%s, %s, %s], "
+    "gyro=[%.4f, %.4f, %.4f], accel=[%.4f, %.4f, %.4f]",
+    imu_gyro_found[0] ? "yes" : "no", imu_gyro_found[1] ? "yes" : "no",
+    imu_gyro_found[2] ? "yes" : "no", imu_accel_found[0] ? "yes" : "no",
+    imu_accel_found[1] ? "yes" : "no", imu_accel_found[2] ? "yes" : "no", gyro[0], gyro[1],
+    gyro[2], accelero[0], accelero[1], accelero[2]);
 
   if (!imu_gyro_found[0] || !imu_gyro_found[1] || !imu_gyro_found[2])
   {
@@ -449,6 +450,179 @@ void ObservationFormatter::set_velocity_commands(const std::vector<double> & com
       logger, "Velocity commands size mismatch: expected 7, got %zu. Keeping previous commands.",
       commands.size());
   }
+}
+
+bool ObservationFormatter::extract_feet_contacts(
+  const control_msgs::msg::Float64Values & interface_data, double & left_contact,
+  double & right_contact)
+{
+  left_contact = 0.0;
+  right_contact = 0.0;
+
+  if (interface_names_.empty() || interface_data.values.empty())
+  {
+    return false;
+  }
+
+  auto logger = rclcpp::get_logger("observation_formatter");
+  const size_t count = std::min(interface_names_.size(), interface_data.values.size());
+
+  // Try to find contact sensors first (binary contact interfaces)
+  // Pattern: "{sensor_name}/contact" or "{sensor_name}/value"
+  bool left_contact_found = false;
+  bool right_contact_found = false;
+
+  for (size_t i = 0; i < count; ++i)
+  {
+    const std::string & interface_name = interface_names_[i];
+    const double value = interface_data.values[i];
+
+    // Check for left foot contact sensor
+    if (!left_contact_found &&
+        (interface_name.find(left_foot_contact_sensor_name_) != std::string::npos ||
+         interface_name.find("left_foot") != std::string::npos) &&
+        (interface_name.find("/contact") != std::string::npos ||
+         interface_name.find("/value") != std::string::npos))
+    {
+      left_contact = (value > 0.5) ? 1.0 : 0.0;  // Binary threshold
+      left_contact_found = true;
+    }
+
+    // Check for right foot contact sensor
+    if (!right_contact_found &&
+        (interface_name.find(right_foot_contact_sensor_name_) != std::string::npos ||
+         interface_name.find("right_foot") != std::string::npos) &&
+        (interface_name.find("/contact") != std::string::npos ||
+         interface_name.find("/value") != std::string::npos))
+    {
+      right_contact = (value > 0.5) ? 1.0 : 0.0;  // Binary threshold
+      right_contact_found = true;
+    }
+  }
+
+  // If both contact sensors found, return success
+  if (left_contact_found && right_contact_found)
+  {
+    static size_t info_counter = 0;
+    if (++info_counter % 250 == 0)  // Log every 250 calls (~10 seconds at 25Hz)
+    {
+      RCLCPP_INFO(
+        logger, "Using contact sensors: left=%.0f, right=%.0f", left_contact, right_contact);
+    }
+    return true;
+  }
+
+  // Try to find force/torque sensors (FTS) as fallback
+  // Pattern: "{sensor_name}/force.x", "{sensor_name}/force.y", "{sensor_name}/force.z"
+  // Compute force magnitude: sqrt(fx^2 + fy^2 + fz^2)
+  bool left_force_x_found = false, left_force_y_found = false, left_force_z_found = false;
+  bool right_force_x_found = false, right_force_y_found = false, right_force_z_found = false;
+  double left_force_x = 0.0, left_force_y = 0.0, left_force_z = 0.0;
+  double right_force_x = 0.0, right_force_y = 0.0, right_force_z = 0.0;
+
+  for (size_t i = 0; i < count; ++i)
+  {
+    const std::string & interface_name = interface_names_[i];
+    const double value = interface_data.values[i];
+
+    // Check for left foot FTS
+    if (interface_name.find("left_foot") != std::string::npos ||
+        interface_name.find("left_fts") != std::string::npos)
+    {
+      if (interface_name.find("/force.x") != std::string::npos)
+      {
+        left_force_x = value;
+        left_force_x_found = true;
+      }
+      else if (interface_name.find("/force.y") != std::string::npos)
+      {
+        left_force_y = value;
+        left_force_y_found = true;
+      }
+      else if (interface_name.find("/force.z") != std::string::npos)
+      {
+        left_force_z = value;
+        left_force_z_found = true;
+      }
+    }
+
+    // Check for right foot FTS
+    if (interface_name.find("right_foot") != std::string::npos ||
+        interface_name.find("right_fts") != std::string::npos)
+    {
+      if (interface_name.find("/force.x") != std::string::npos)
+      {
+        right_force_x = value;
+        right_force_x_found = true;
+      }
+      else if (interface_name.find("/force.y") != std::string::npos)
+      {
+        right_force_y = value;
+        right_force_y_found = true;
+      }
+      else if (interface_name.find("/force.z") != std::string::npos)
+      {
+        right_force_z = value;
+        right_force_z_found = true;
+      }
+    }
+  }
+
+  // Compute contact from force magnitude if all FTS components found
+  // Use z-component only if x/y not available (vertical force is most important for contact)
+  if (left_force_z_found)
+  {
+    double left_force_magnitude;
+    if (left_force_x_found && left_force_y_found)
+    {
+      // Full 3D force vector
+      left_force_magnitude =
+        std::sqrt(left_force_x * left_force_x + left_force_y * left_force_y +
+                  left_force_z * left_force_z);
+    }
+    else
+    {
+      // Use z-component only (vertical force)
+      left_force_magnitude = std::abs(left_force_z);
+    }
+    left_contact = (left_force_magnitude > contact_force_threshold_) ? 1.0 : 0.0;
+    left_contact_found = true;
+  }
+
+  if (right_force_z_found)
+  {
+    double right_force_magnitude;
+    if (right_force_x_found && right_force_y_found)
+    {
+      // Full 3D force vector
+      right_force_magnitude =
+        std::sqrt(right_force_x * right_force_x + right_force_y * right_force_y +
+                  right_force_z * right_force_z);
+    }
+    else
+    {
+      // Use z-component only (vertical force)
+      right_force_magnitude = std::abs(right_force_z);
+    }
+    right_contact = (right_force_magnitude > contact_force_threshold_) ? 1.0 : 0.0;
+    right_contact_found = true;
+  }
+
+  // Return true if at least one sensor type was found
+  if (left_contact_found && right_contact_found)
+  {
+    static size_t info_counter = 0;
+    if (++info_counter % 250 == 0)  // Log every 250 calls (~10 seconds at 25Hz)
+    {
+      RCLCPP_INFO(
+        logger, "Using FTS sensors for contact: left=%.0f, right=%.0f", left_contact,
+        right_contact);
+    }
+    return true;
+  }
+
+  // No contact sensors found
+  return false;
 }
 
 }  // namespace motion_controller

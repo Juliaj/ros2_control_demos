@@ -60,6 +60,16 @@ public:
   std::vector<double> extract_joint_velocities(
     const control_msgs::msg::Float64Values & interface_data);
 
+  // Extract feet contact data from interface data (uses real sensors if available)
+  // Returns [left_contact, right_contact] as binary values (1.0 = contact, 0.0 = no contact)
+  // Checks for:
+  //   1. Contact sensors (e.g., "left_foot_contact/contact", "right_foot_contact/contact")
+  //   2. Force/torque sensors (FTS) - uses force magnitude threshold
+  //   3. Returns false if no sensors found (caller should use phase-based estimation)
+  bool extract_feet_contacts(
+    const control_msgs::msg::Float64Values & interface_data, double & left_contact,
+    double & right_contact);
+
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
 
@@ -83,6 +93,15 @@ public:
 
   // Get imitation phase values [cos, sin]
   std::vector<double> get_imitation_phase() const { return imitation_phase_; }
+
+  // Get imitation phase counter (for logging/debugging)
+  // Imitation: gait phase counter (0 to phase_period_) tracking position in walking cycle.
+  // Used to encode rhythmic leg coordination via [cos(θ), sin(θ)] where θ = (imitation_i / phase_period_) * 2π.
+  // The model was trained with imitation learning to follow reference gait patterns.
+  double get_imitation_i() const { return imitation_i_; }
+
+  // Get phase period (for logging/debugging)
+  double get_phase_period() const { return phase_period_; }
 
   // Get action history for debugging
   std::vector<double> get_last_action() const { return last_action_; }
@@ -128,6 +147,11 @@ private:
 
   // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
+
+  // Contact sensor names (configurable, defaults to common patterns)
+  std::string left_foot_contact_sensor_name_;
+  std::string right_foot_contact_sensor_name_;
+  double contact_force_threshold_;  // Force threshold for FTS-based contact detection (N)
 
   // Names associated with incoming Float64Values message
   std::vector<std::string> interface_names_;

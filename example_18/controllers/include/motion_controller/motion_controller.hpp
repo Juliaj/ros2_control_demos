@@ -72,17 +72,17 @@ private:
   void initialize_joint_limits();
 
 #ifdef ONNXRUNTIME_FOUND
-  // Utility functions for ONNX model debugging
+  // Utility functions for ONNX model validation
   static std::string format_shape_string(const std::vector<int64_t> & shape);
   static const char * get_onnx_type_name(ONNXTensorElementDataType type);
-  void log_input_metadata(Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator);
-  void log_output_metadata(Ort::Session & session, Ort::AllocatorWithDefaultOptions & allocator);
   void validate_model_structure(size_t num_inputs, size_t num_outputs);
 #endif
 
   // Parameters
   std::vector<std::string> joint_names_;
   std::string model_path_;
+  int model_input_size_;   // Expected model input dimension (0 = not specified)
+  int model_output_size_;  // Expected model output dimension (0 = not specified)
   std::string interfaces_broadcaster_topic_;
   std::string interfaces_broadcaster_names_topic_;
   std::string velocity_command_topic_;
@@ -136,8 +136,9 @@ private:
 
   // Motor speed limits: prevent exceeding physical motor velocity capability
   double max_motor_velocity_;  // rad/s (default: 5.24 from reference implementation)
+  std::vector<double> motor_targets_;  // Current motor targets (used in observation, matches reference)
   std::vector<double> prev_motor_targets_;  // Previous joint commands for rate limiting
-  bool prev_motor_targets_initialized_;  // Track if prev_motor_targets_ has been set from actual positions
+  bool prev_motor_targets_initialized_;  // Track if prev_motor_targets_ has been initialized
   bool command_received_;  // Track if any velocity command has been received (to avoid moving before command)
 
   // 1st attempt to tackle model stability
@@ -146,19 +147,11 @@ private:
 
   // Open Duck Mini specific parameters
   double phase_frequency_factor_offset_;
+  double phase_period_;  // Phase period (nb_steps_in_period) for logging
+  double training_control_period_;  // Training control period (default: 0.02s for 50Hz)
 
-  // ONNX Runtime: Action quality monitoring
+  // Update counter
   size_t update_count_;
-  size_t total_clamps_;
-  std::vector<size_t> joint_clamp_counts_;
-  std::vector<double> action_max_values_;
-  std::vector<double> action_min_values_;
-  std::vector<double> previous_joint_commands_;
-  double total_action_change_;
-  size_t extreme_action_count_;
-
-  // Report action quality statistics
-  void report_action_quality(const std::vector<double> & joint_commands, size_t num_clamped);
 };
 
 }  // namespace motion_controller

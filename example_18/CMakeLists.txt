@@ -184,12 +184,100 @@ if(BUILD_TESTING)
     controllers/test/test_onnx_shape_handling.cpp
   )
 
-  add_custom_target(build_example_18_tests ALL
-    DEPENDS
-      test_observation_formatter
-      test_action_processor
-      test_onnx_shape_handling
-  )
+  # Unit tests for MotionController with MuJoCo (headless simulation)
+  # MuJoCo dependency resolution (following mujoco_ros2_control pattern):
+  # 1. Try find_package(mujoco) - if installed from source with CMake
+  # 2. Check MUJOCO_INSTALL_DIR environment variable - if installed to custom location
+  # 3. Auto-download via FetchContent - as last resort (downloads binary release)
+  find_package(mujoco QUIET)
+  if(mujoco_FOUND)
+    message(STATUS "MuJoCo build from source has been found")
+    set(MUJOCO_LIB mujoco::mujoco)
+    set(MUJOCO_INCLUDE_DIR ${MUJOCO_INCLUDE_DIR})
+  elseif(DEFINED ENV{MUJOCO_INSTALL_DIR})
+    message(STATUS "MuJoCo build from source has not been found. Attempting to find the binary in $ENV{MUJOCO_INSTALL_DIR} instead.")
+    set(MUJOCO_DIR $ENV{MUJOCO_INSTALL_DIR})
+    find_library(MUJOCO_LIB mujoco HINTS $ENV{MUJOCO_DIR}/lib)
+    if(NOT MUJOCO_LIB)
+      set(mujoco_FOUND FALSE)
+    else()
+      set(MUJOCO_INCLUDE_DIR $ENV{MUJOCO_DIR}/include)
+      set(mujoco_FOUND TRUE)
+    endif()
+  else()
+    include(FetchContent)
+    
+    # Detect architecture
+    set(MUJOCO_VERSION "3.4.0")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      set(CPU_ARCH "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+      set(CPU_ARCH "aarch64")
+    endif()
+    
+    if(CPU_ARCH)
+      message(STATUS "No MuJoCo installation found. Downloading MuJoCo ${MUJOCO_VERSION} for ${CPU_ARCH}.")
+      
+      set(MUJOCO_DOWNLOAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/mujoco)
+      set(MUJOCO_EXTRACT_DIR ${MUJOCO_DOWNLOAD_DIR}/mujoco-${MUJOCO_VERSION})
+      set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+      FetchContent_Declare(
+        mujoco_download
+        URL https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-${CPU_ARCH}.tar.gz
+        SOURCE_DIR ${MUJOCO_EXTRACT_DIR}
+        DOWNLOAD_EXTRACT_TIMESTAMP True
+      )
+      FetchContent_MakeAvailable(mujoco_download)
+      
+      set(MUJOCO_DIR ${MUJOCO_EXTRACT_DIR})
+      message(STATUS "MuJoCo downloaded to: ${MUJOCO_DIR}")
+      
+      find_library(MUJOCO_LIB mujoco HINTS ${MUJOCO_DIR}/lib NO_DEFAULT_PATH)
+      if(MUJOCO_LIB)
+        set(MUJOCO_INCLUDE_DIR ${MUJOCO_DIR}/include)
+        set(mujoco_FOUND TRUE)
+      endif()
+    endif()
+  endif()
+
+  if(mujoco_FOUND)
+    ament_add_gtest(test_motion_controller_mujoco
+      controllers/test/test_motion_controller_mujoco.cpp
+    )
+    target_include_directories(test_motion_controller_mujoco PRIVATE
+      ${PROJECT_SOURCE_DIR}/controllers/include
+    )
+    
+    # Use imported target if available, otherwise use manual variables
+    if(TARGET mujoco::mujoco)
+      target_link_libraries(test_motion_controller_mujoco
+        mujoco::mujoco
+      )
+    else()
+      target_include_directories(test_motion_controller_mujoco SYSTEM PRIVATE
+        ${MUJOCO_INCLUDE_DIR}
+      )
+      target_link_libraries(test_motion_controller_mujoco
+        ${MUJOCO_LIB}
+      )
+    endif()
+    
+    add_custom_target(build_example_18_tests ALL
+      DEPENDS
+        test_observation_formatter
+        test_action_processor
+        test_onnx_shape_handling
+        test_motion_controller_mujoco
+    )
+  else()
+    message(STATUS "MuJoCo C++ library not found. Skipping test_motion_controller_mujoco.")
+    add_custom_target(build_example_18_tests ALL
+      DEPENDS
+        test_observation_formatter
+        test_action_processor
+        test_onnx_shape_handling
+    )
+  endif()
 endif()
 
 ## EXPORTS

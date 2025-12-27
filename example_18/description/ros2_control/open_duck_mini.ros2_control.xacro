@@ -26,6 +26,9 @@
           <param name="mujoco_model">$(find ros2_control_demo_example_18)/description/mujoco/scene.xml</param>
           <param name="meshdir">$(find ros2_control_demo_example_18)/description/assets</param>
           <param name="pids_config_file">$(find ros2_control_demo_example_18)/config/open_duck_mini_pids.yaml</param>
+          <!-- Initialize robot from "home" keyframe to match reference implementation -->
+          <!-- Source: scene_flat_terrain.xml keyframe "home" -->
+          <param name="override_start_position_file">$(find ros2_control_demo_example_18)/description/mujoco/start_positions.xml</param>
         </hardware>
       </xacro:unless>
       <xacro:if value="${use_mock_hardware}">

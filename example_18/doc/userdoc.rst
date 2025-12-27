@@ -13,16 +13,12 @@ Prerequisites
 
 .. code-block:: bash
 
-   # ONNX Runtime
+   # ONNX Runtime (test on RTX 3080Ti, and RTX 5090 with cuda 12.8 and driver 570.144)
    wget https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/onnxruntime-linux-x64-1.23.2.tgz
    tar -xzf onnxruntime-linux-x64-1.23.2.tgz
    sudo cp -r onnxruntime-linux-x64-1.23.2/include/* /usr/local/include/
    sudo cp -r onnxruntime-linux-x64-1.23.2/lib/* /usr/local/lib/
    sudo ldconfig
-
-   # Gazebo (gz-sim Harmonic or newer recommended)
-   sudo apt-get update
-   sudo apt-get install ros-${ROS_DISTRO}-ros-gz
 
 - Place the trained policy at ``onnx_model/policy_biped_25hz_a.onnx``.
 - Source your ROS 2 workspace before running any commands below.

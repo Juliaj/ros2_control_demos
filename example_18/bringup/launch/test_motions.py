@@ -16,6 +16,15 @@
 #
 # Authors: Julia Jia
 
+"""
+Test motion sequences for Open Duck Mini robot.
+
+Based on validate_onnx_simulation.py reference implementation:
+- Default forward velocity: 0.15 m/s (max forward, matching training)
+- Command format: [lin_vel_x, lin_vel_y, ang_vel, neck_pitch, head_pitch, head_yaw, head_roll]
+- Head commands default to zero (neutral position)
+"""
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -31,7 +40,7 @@ class DriveForward(Node):
         )
         self.get_logger().info('Drive forward node started')
 
-    def drive_forward(self, duration=2.0, lin_vel_x=0.4, lin_vel_y=0.0, ang_vel_z=0.0, stabilize_time=2.0):
+    def drive_forward(self, duration=2.0, lin_vel_x=0.15, lin_vel_y=0.0, ang_vel_z=0.0, stabilize_time=2.0):
         # Wait for publisher to discover subscribers
         self.get_logger().info('Waiting for subscribers...')
         while self.publisher_.get_subscription_count() == 0:
@@ -56,12 +65,14 @@ class DriveForward(Node):
                 time.sleep(sleep_time)
 
         # Motion phase (skip if duration is 0)
+        # Command format matches validate_onnx_simulation.py ForwardWalkCommand:
+        # [lin_vel_x, lin_vel_y, ang_vel, neck_pitch, head_pitch, head_yaw, head_roll]
         if duration > 0:
             msg = VelocityCommandWithHead()
             msg.base_velocity.linear.x = float(lin_vel_x)
             msg.base_velocity.linear.y = float(lin_vel_y)
             msg.base_velocity.angular.z = float(ang_vel_z)
-            msg.head_commands = [0.0, 0.0, 0.0, 0.0]  # Keep head neutral
+            msg.head_commands = [0.0, 0.0, 0.0, 0.0]  # Head neutral (matches reference default)
 
             self.get_logger().info(
                 f'Moving for {duration} seconds: '
@@ -96,31 +107,38 @@ def main(args=None):
     rclpy.init(args=args)
     node = DriveForward()
     
-    node.get_logger().info('=== Starting Multi-Motion Test (using real robot velocities) ===')
+    node.get_logger().info('=== Starting Multi-Motion Test (matching validate_onnx_simulation.py) ===')
     
     # Test 1: Stabilization (standing still)
-    node.get_logger().info('Test 1: Stabilization (4s)')
-    node.drive_forward(duration=0.0, stabilize_time=4.0)
+    # Reference: validate_onnx_simulation.py - robot starts in default pose
+    # node.get_logger().info('Test 1: Stabilization (4s) - matching reference initialization')
+    # node.drive_forward(duration=0.0, stabilize_time=4.0)
     
-    # Test 2: Forward walk - EXACT velocity from real robot (fc_test.py line 47)
-    node.get_logger().info('Test 2: Forward walk (4s at 0.15 m/s - trained velocity)')
-    node.drive_forward(duration=4.0, lin_vel_x=0.15, stabilize_time=0.0)
+    # Test 2: Forward walk - matching validate_onnx_simulation.py ForwardWalkCommand
+    # Reference: validate_onnx_simulation.py line 43-66, default linear_vel_x=0.15
+    node.get_logger().info('Test 2: Forward walk (4s at 0.15 m/s - default max forward from reference)')
+    node.drive_forward(duration=10.0, lin_vel_x=0.15, stabilize_time=0.0)
     
-    # Test 3: Backward walk - EXACT velocity from real robot (fc_test.py line 74)
-    node.get_logger().info('Test 3: Backward walk (4s at -0.15 m/s)')
-    node.drive_forward(duration=4.0, lin_vel_x=-0.15, stabilize_time=0.0)
+    # # Test 3: Backward walk - reverse of forward
+    # node.get_logger().info('Test 3: Backward walk (4s at -0.15 m/s)')
+    # node.drive_forward(duration=4.0, lin_vel_x=-0.15, stabilize_time=0.0)
     
-    # Test 4: Turn left - EXACT velocity from real robot (fc_test.py line 56)
-    node.get_logger().info('Test 4: Turn left (4s at 1.0 rad/s - trained velocity)')
-    node.drive_forward(duration=4.0, ang_vel_z=1.0, stabilize_time=0.0)
+    # # Test 4: Turn left - moderate angular velocity
+    # node.get_logger().info('Test 4: Turn left (4s at 0.5 rad/s)')
+    # node.drive_forward(duration=4.0, ang_vel_z=0.5, stabilize_time=0.0)
     
-    # Test 5: Turn right - EXACT velocity from real robot (fc_test.py line 65)
-    node.get_logger().info('Test 5: Turn right (4s at -1.0 rad/s)')
-    node.drive_forward(duration=4.0, ang_vel_z=-1.0, stabilize_time=0.0)
+    # # Test 5: Turn right - reverse of turn left
+    # node.get_logger().info('Test 5: Turn right (4s at -0.5 rad/s)')
+    # node.drive_forward(duration=4.0, ang_vel_z=-0.5, stabilize_time=0.0)
     
-    # Final: Stop and stabilize
-    node.get_logger().info('Final: Stopping and stabilizing (3s)')
-    node.drive_forward(duration=0.0, stabilize_time=3.0)
+    # # Test 6: Forward walk at reference velocity (longer duration for validation)
+    # # Reference: validate_onnx_simulation.py uses 120s default duration
+    # node.get_logger().info('Test 6: Extended forward walk (10s at 0.15 m/s - validation test)')
+    # node.drive_forward(duration=10.0, lin_vel_x=0.15, stabilize_time=0.0)
+    
+    # # Final: Stop and stabilize
+    # node.get_logger().info('Final: Stopping and stabilizing (3s)')
+    # node.drive_forward(duration=0.0, stabilize_time=3.0)
     
     node.get_logger().info('=== Multi-Motion Test Complete ===')
     rclpy.shutdown()

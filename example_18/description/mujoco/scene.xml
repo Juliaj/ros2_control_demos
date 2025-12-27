@@ -6,12 +6,16 @@
 	<include file="open_duck_mini_v2.xml"/>
 	
 	<!-- Simulation settings -->
-	<option timestep="0.01"/>  <!-- 100 Hz for ros2_control -->
+	<!-- CRITICAL: Timestep must match reference (0.002s = 2ms) for stability -->
+	<!-- Reference: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 15 -->
+	<!-- Note: Timestep is set programmatically in reference, but we set it here for mujoco_ros2_control -->
+	<option timestep="0.002"/>  <!-- 500 Hz simulation, 50 Hz control with decimation=10 -->
 	
-	<!-- Ground friction settings -->
+	<!-- Ground friction settings - match reference -->
+	<!-- Reference: scene_flat_terrain.xml line 36: friction="0.6" -->
 	<default>
 		<!-- sliding friction, torsional friction, rolling friction -->
-		<geom friction="1.5 0.01 0.0006"/>
+		<geom friction="0.6 0.01 0.0006"/>
 	</default>
 	
 	<!-- Visualization settings -->
@@ -32,8 +36,51 @@
 	<worldbody>
 		<light pos="0 0 3" dir="0 0 -1" directional="false" />
 		<body name="floor">
-			<geom pos="0 0 0" name="floor" size="0 0 .125" type="plane" material="groundplane" conaffinity="1" contype="1" />
+			<!-- Match reference: scene_flat_terrain.xml line 35 -->
+			<!-- Reference uses size="0 0 0.01" but we keep .125 for visualization -->
+			<geom pos="0 0 0" name="floor" size="0 0 .125" type="plane" material="groundplane" 
+				conaffinity="1" contype="1" friction="0.6" condim="3" />
 		</body>
 	</worldbody>
+	
+	<!-- Home keyframe - CRITICAL for initial pose matching reference -->
+	<!-- Reference: scene_flat_terrain.xml lines 39-75 -->
+	<!-- This keyframe defines the initial robot pose used in validate_onnx_simulation.py -->
+	<keyframe>
+		<key name="home"
+			qpos="
+			0 0 0.15
+			1 0 0 0
+			0.002
+			0.053
+			-0.63
+			1.368
+			-0.784
+			0
+			0
+			0
+			0
+			-0.003
+			-0.065
+			0.635
+			1.379
+			-0.796
+			"
+			ctrl="
+			0.002
+			0.053
+			-0.63
+			1.368
+			-0.784
+			0
+			0
+			0
+			0
+			-0.003
+			-0.065
+			0.635
+			1.379
+			-0.796
+			"/>
+	</keyframe>
 </mujoco>
-

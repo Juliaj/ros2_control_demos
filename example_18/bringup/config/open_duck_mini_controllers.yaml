@@ -20,7 +20,7 @@ controller_manager:
     # Note: PID gains configuration available in open_duck_mini_pids.yaml
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/xmls/open_duck_mini_v2.xml
     # To enable PID control, add pids_config_file parameter to ros2_control xacro
-    update_rate: 25
+    update_rate: 50
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -102,9 +102,6 @@ state_interfaces_broadcaster:
 
 motion_controller:
   ros__parameters:
-    # Source: Configuration for Open Duck Mini robot (14 DoF: 10 leg + 4 head)
-    # All parameter values sourced from Open_Duck_Playground
-    # Primary sources: playground/open_duck_mini_v2/mujoco_infer.py and mujoco_infer_base.py
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py
     # Update rate: 1/(sim_dt * decimation) = 1/(0.002 * 10) = 50 Hz
     update_rate: 50
@@ -131,11 +128,12 @@ motion_controller:
       - right_ankle        # 13
 
     # Model configuration
-    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 38
-    # ONNX model path for RL-based walking controller
-    # Model trained using Open_Duck_Playground RL training pipeline
-    model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/BEST_WALK_ONNX_2.onnx"
-
+    model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/open_duck_mini_v2.onnx"
+    # Model input/output dimensions for validation
+    # Source: open_duck_mini_v2.onnx.metadata.json (obs_size, act_size)
+    model_input_size: 101   # Observation dimension
+    model_output_size: 14   # Action dimension (number of joints)
+    
     # ROS2 topic configuration
     # Source: Standard ROS2 topic naming conventions
     interfaces_broadcaster_topic: "state_interfaces_broadcaster/values"
@@ -146,6 +144,12 @@ motion_controller:
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 31
     # Scales RL policy output actions before applying to joints
     action_scale: 0.25
+    # Source: Open_Duck_Playground/tests/validate_onnx_simulation.py line 114
+    # Maximum motor velocity limit (rad/s) for rate limiting joint commands
+    max_motor_velocity: 5.24
+    # Source: Open_Duck_Playground/tests/validate_onnx_simulation.py line 116
+    # Joint velocity scaling factor for observation (dof_vel_scale)
+    dof_vel_scale: 0.05
 
     # Default joint positions (init_pos) for relative position calculation
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml
@@ -157,6 +161,13 @@ motion_controller:
     #          neck_pitch, head_pitch, head_yaw, head_roll,
     #          right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle]
     default_joint_positions: [0.002, 0.053, -0.63, 1.368, -0.784, 0.0, 0.0, 0.0, 0.0, -0.003, -0.065, 0.635, 1.379, -0.796]
+    
+    # Default actuator values (default_actuator) - same as default_joint_positions
+    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 121-123
+    # motor_targets and prev_motor_targets are initialized to default_actuator at startup
+    # Reference: validate_onnx_simulation.py lines 124-125: motor_targets = default_actuator, prev_motor_targets = default_actuator
+    # Used for motor target initialization consistency with reference implementation
+    default_actuator: [0.002, 0.053, -0.63, 1.368, -0.784, 0.0, 0.0, 0.0, 0.0, -0.003, -0.065, 0.635, 1.379, -0.796]
 
     # Head joint indices (receive additional head commands from velocity_commands[3:7])
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py lines 147-150
@@ -175,6 +186,17 @@ motion_controller:
     # Control state parameters
     # Source: Default value (not explicitly set in Playground mujoco_infer.py)
     start_paused: false
+
+    # Training control period (CRITICAL: Must match controller_manager update_rate)
+    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py
+    # Training uses: sim_dt * decimation = 0.002 * 10 = 0.02s (50Hz)
+    # IMPORTANT: This value MUST match the controller_manager update_rate period
+    #   - controller_manager update_rate: 50 Hz = 0.02s period
+    #   - training_control_period: 0.02s
+    # If these don't match, the controller will warn about period mismatch
+    # Mismatched periods cause incorrect phase/gait timing and motor velocity limits
+    # The controller validates this at runtime and logs warnings if period differs by >1ms
+    training_control_period: 0.02
 
     # Gait phase parameters
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 60
