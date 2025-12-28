@@ -82,3 +82,26 @@ Using Python Script:
 You can also use the existing test script:
 
 ros2 run ros2_control_demo_example_18 test_motions
+
+
+## Control Decimation Configuration
+
+This document provides a brief overview of control decimation. For detailed information, see `doc/design.rst`.
+
+### Summary
+
+The controller runs at **50 Hz** (0.02s period) with a simulation timestep of **0.002s**, resulting in an implicit decimation of **10 steps per control update**. This matches the reference implementation exactly.
+
+### Configuration
+
+- **Controller update rate**: 50 Hz (configured in `open_duck_mini_controllers.yaml`)
+- **Simulation timestep**: 0.002s (configured in `scene.xml`)
+- **Decimation**: 0.02s / 0.002s = 10 steps per control update
+
+### Verification
+
+The decimation is automatically correct if:
+- Controller update rate is 50 Hz
+- Simulation timestep is 0.002s
+
+No additional configuration is needed.

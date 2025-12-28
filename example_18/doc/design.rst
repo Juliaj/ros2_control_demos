@@ -31,7 +31,23 @@ Data Flow
 LocomotionController
 --------------------
 
-Update Rate: 25 Hz
+Update Rate: 50 Hz
+
+The controller runs at 50 Hz (0.02s period) to match the reference implementation's decimation of 10 simulation steps per control update.
+
+Control Decimation
+~~~~~~~~~~~~~~~~~~
+
+The reference implementation uses explicit decimation: 10 simulation steps (0.002s each) per control update, resulting in a 50 Hz control rate. mujoco_ros2_control achieves the same decimation implicitly:
+
+- Controller update rate: 50 Hz (0.02s period)
+- Simulation timestep: 0.002s (from scene.xml)
+- Implicit decimation: 0.02s / 0.002s = 10 steps per control update
+
+This matches the reference implementation exactly. Actions are applied at each controller update and held constant for approximately 10 simulation steps.
+
+Motor velocity limits are calculated using the controller period:
+``max_change = max_motor_velocity * dt = 5.24 * 0.02 = 0.1048 rad per control period``
 
 Inputs:
 
@@ -47,7 +63,7 @@ Inputs:
 Processing:
 
 - Format observation vector for ONNX model
-- Run inference using policy_biped_25hz_a.onnx
+- Run inference using ONNX model
 - Process model outputs (scale, clamp to limits)
 - Write joint position commands to hardware
 
@@ -103,7 +119,7 @@ Design decision: Use `robot_motors.xml` (via `scene.xml`) to match the training 
 Controller Manager
 ------------------
 
-- Runs control loop at 25 Hz
+- Runs control loop at 50 Hz
 - Manages lifecycle of state_interfaces_broadcaster and LocomotionController
 
 User Command Interface

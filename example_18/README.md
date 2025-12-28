@@ -12,6 +12,6 @@ uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/fine_tun
 
 **Note**: This script now collects base linear velocity from the velocimeter sensor (indices 40-42 in state_interfaces_broadcaster). The data is saved as `base_linear_velocities` dataset in the HDF5 file, which is used by the replay environment for proper reward computation.
 
-cp /home/juliajia/dev/Open_Duck_Playground/checkpoints/2025_12_27_220956_6881280.onnx src/ros-controls/ros2_control_demos/example_18/onnx_model/open_duck_mini_v2.onnx
+cp /home/juliajia/dev/Open_Duck_Playground/checkpoints/2025_12_27_220956_6881280.onnx src/ros-controls/ros2_control_demos/example_18/onnx_model/2025_12_27_220956_6881280.onnx
 
 ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py
