@@ -25,7 +25,9 @@
           <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
           <param name="mujoco_model">$(find ros2_control_demo_example_18)/description/mujoco/scene.xml</param>
           <param name="meshdir">$(find ros2_control_demo_example_18)/description/assets</param>
-          <param name="pids_config_file">$(find ros2_control_demo_example_18)/config/open_duck_mini_pids.yaml</param>
+          <!-- DISABLED: Using MuJoCo's built-in position actuators (kp=13.37) instead of external PID -->
+          <!-- External PID adds loop delay and numerical differences compared to Python reference -->
+          <!-- <param name="pids_config_file">$(find ros2_control_demo_example_18)/config/open_duck_mini_pids.yaml</param> -->
           <!-- Initialize robot from "home" keyframe to match reference implementation -->
           <!-- Source: scene_flat_terrain.xml keyframe "home" -->
           <param name="override_start_position_file">$(find ros2_control_demo_example_18)/description/mujoco/start_positions.xml</param>
@@ -42,8 +44,9 @@
       <!-- Order matches example_config.json joints_offsets (lines 14-18) -->
       <joint name="${prefix}left_hip_yaw">
         <command_interface name="position">
-          <param name="min">-0.52359877559829881566</param>
-          <param name="max">0.52359877559829881566</param>
+          <!-- Joint limits set to very large values for data collection - reference motion may exceed URDF limits -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -51,8 +54,9 @@
       </joint>
       <joint name="${prefix}left_hip_roll">
         <command_interface name="position">
-          <param name="min">-0.43633231299858238339</param>
-          <param name="max">0.43633231299858238339</param>
+          <!-- Joint limits set to very large values for data collection -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -60,8 +64,8 @@
       </joint>
       <joint name="${prefix}left_hip_pitch">
         <command_interface name="position">
-          <param name="min">-1.2217304763960306069</param>
-          <param name="max">0.52359877559829881566</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -69,8 +73,8 @@
       </joint>
       <joint name="${prefix}left_knee">
         <command_interface name="position">
-          <param name="min">-1.570796326794896558</param>
-          <param name="max">1.570796326794896558</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -78,8 +82,8 @@
       </joint>
       <joint name="${prefix}left_ankle">
         <command_interface name="position">
-          <param name="min">-1.570796326794896558</param>
-          <param name="max">1.570796326794896558</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -92,8 +96,8 @@
       <!-- Source: v2_rl_walk_mujoco.py lines 310-311, biped_robot_controllers.yaml head_joint_indices -->
       <joint name="${prefix}neck_pitch">
         <command_interface name="position">
-          <param name="min">-0.3490658503988437</param>  <!-- ~-20 degrees -->
-          <param name="max">1.1344640137963364</param>   <!-- ~65 degrees -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -101,8 +105,8 @@
       </joint>
       <joint name="${prefix}head_pitch">
         <command_interface name="position">
-          <param name="min">-0.785398163397448279</param>  <!-- -45 degrees -->
-          <param name="max">0.785398163397448279</param>   <!-- +45 degrees -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -110,8 +114,8 @@
       </joint>
       <joint name="${prefix}head_yaw">
         <command_interface name="position">
-          <param name="min">-2.792526803190927</param>  <!-- ~-160 degrees -->
-          <param name="max">2.792526803190927</param>   <!-- ~+160 degrees -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -119,8 +123,8 @@
       </joint>
       <joint name="${prefix}head_roll">
         <command_interface name="position">
-          <param name="min">-0.523598775598218</param>  <!-- ~-30 degrees -->
-          <param name="max">0.5235987755983796</param>   <!-- ~+30 degrees -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -131,8 +135,8 @@
       <!-- Order matches example_config.json joints_offsets (lines 23-27) -->
       <joint name="${prefix}right_hip_yaw">
         <command_interface name="position">
-          <param name="min">-0.52359877559829881566</param>
-          <param name="max">0.52359877559829881566</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -140,8 +144,8 @@
       </joint>
       <joint name="${prefix}right_hip_roll">
         <command_interface name="position">
-          <param name="min">-0.43633231299858238339</param>
-          <param name="max">0.43633231299858238339</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -149,8 +153,8 @@
       </joint>
       <joint name="${prefix}right_hip_pitch">
         <command_interface name="position">
-          <param name="min">-0.52359877559829881566</param>
-          <param name="max">1.2217304763960306069</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -158,8 +162,8 @@
       </joint>
       <joint name="${prefix}right_knee">
         <command_interface name="position">
-          <param name="min">-1.570796326794896558</param>
-          <param name="max">1.570796326794896558</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -167,8 +171,8 @@
       </joint>
       <joint name="${prefix}right_ankle">
         <command_interface name="position">
-          <param name="min">-1.570796326794896558</param>
-          <param name="max">1.570796326794896558</param>
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
         </command_interface>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
@@ -195,6 +199,41 @@
         <state_interface name="linear_acceleration.x"/>
         <state_interface name="linear_acceleration.y"/>
         <state_interface name="linear_acceleration.z"/>
+      </sensor>
+
+      <!-- Velocimeter sensor - base linear velocity in local frame -->
+      <!-- MuJoCo sensor: velocimeter (local_linvel) -->
+      <!-- Provides 3D linear velocity of the base in the local frame -->
+      <sensor name="${prefix}velocimeter">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">velocimeter</param>
+          <param name="mujoco_sensor_name">local_linvel</param>
+        </xacro:unless>
+        <state_interface name="linear_velocity.x"/>
+        <state_interface name="linear_velocity.y"/>
+        <state_interface name="linear_velocity.z"/>
+      </sensor>
+
+      <!-- Contact sensors - MuJoCo collision detection -->
+      <!-- Reference: Python mujoco_infer_base.py get_feet_contacts() (lines 280-283) -->
+      <!-- Checks collisions between foot bodies and floor using mj_data_->contact[] array -->
+      <!-- Matches Python reference: check_contact(data, "foot_assembly", "floor") -->
+      <sensor name="${prefix}left_foot_contact">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">contact</param>
+          <param name="body1_name">foot_assembly</param>
+          <param name="body2_name">floor</param>
+        </xacro:unless>
+        <state_interface name="contact"/>
+      </sensor>
+
+      <sensor name="${prefix}right_foot_contact">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">contact</param>
+          <param name="body1_name">foot_assembly_2</param>
+          <param name="body2_name">floor</param>
+        </xacro:unless>
+        <state_interface name="contact"/>
       </sensor>
     </ros2_control>
 

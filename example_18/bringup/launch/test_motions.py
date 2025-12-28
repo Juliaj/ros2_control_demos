@@ -46,8 +46,11 @@ class DriveForward(Node):
         while self.publisher_.get_subscription_count() == 0:
             time.sleep(0.1)
         self.get_logger().info(f'Connected to {self.publisher_.get_subscription_count()} subscriber(s)')
+        
+        # Give connection time to fully establish
+        time.sleep(0.5)
 
-        publish_rate = 10  # Hz
+        publish_rate = 50  # Hz (match controller update rate)
         sleep_time = 1.0 / publish_rate
 
         # Stabilization phase: send zero velocity to let robot stabilize
@@ -80,8 +83,14 @@ class DriveForward(Node):
             )
 
             start_time = time.time()
+            msg_count = 0
             while rclpy.ok() and (time.time() - start_time) < duration:
                 self.publisher_.publish(msg)
+                msg_count += 1
+                if msg_count % 50 == 0:  # Log every 50 messages (~1 second at 50 Hz)
+                    self.get_logger().info(
+                        f'Published {msg_count} messages (elapsed: {time.time() - start_time:.1f}s)'
+                    )
                 time.sleep(sleep_time)
 
             self.get_logger().info('Motion command completed')
@@ -116,8 +125,8 @@ def main(args=None):
     
     # Test 2: Forward walk - matching validate_onnx_simulation.py ForwardWalkCommand
     # Reference: validate_onnx_simulation.py line 43-66, default linear_vel_x=0.15
-    node.get_logger().info('Test 2: Forward walk (4s at 0.15 m/s - default max forward from reference)')
-    node.drive_forward(duration=10.0, lin_vel_x=0.15, stabilize_time=0.0)
+    node.get_logger().info('Test 2: Forward walk (10s at 0.15 m/s - default max forward from reference)')
+    node.drive_forward(duration=20.0, lin_vel_x=0.15, stabilize_time=0.0)
     
     # # Test 3: Backward walk - reverse of forward
     # node.get_logger().info('Test 3: Backward walk (4s at -0.15 m/s)')

@@ -11,6 +11,11 @@
 	<!-- Note: Timestep is set programmatically in reference, but we set it here for mujoco_ros2_control -->
 	<option timestep="0.002"/>  <!-- 500 Hz simulation, 50 Hz control with decimation=10 -->
 	
+	<!-- Contact buffer allocation for collision detection -->
+	<!-- Required for contact sensors in mujoco_ros2_control -->
+	<!-- Allocate space for 200 simultaneous contacts (typical biped needs ~20-50) -->
+	<size nconmax="200"/>
+	
 	<!-- Ground friction settings - match reference -->
 	<!-- Reference: scene_flat_terrain.xml line 36: friction="0.6" -->
 	<default>

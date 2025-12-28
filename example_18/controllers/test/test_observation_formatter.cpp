@@ -200,6 +200,78 @@ TEST_F(TestObservationFormatter, VelocityCommandFormat)
   EXPECT_FLOAT_EQ(observation[12], 0.0f);  // head_pos_4
 }
 
+TEST_F(TestObservationFormatter, ImuUpsideDownInversion)
+{
+  // Create interface data with known accelerometer values
+  // MuJoCo reports negative z when standing (ground pushes down in sensor frame)
+  // Example: accel = [0.0, 0.0, -9.8] for a standing robot
+  control_msgs::msg::Float64Values interface_data;
+  geometry_msgs::msg::Twist velocity_cmd;
+
+  // Interface data format: 10 IMU values + 2*num_joints_ (position + velocity per joint)
+  const size_t expected_size = 10 + 2 * num_joints_;
+  interface_data.values.resize(expected_size, 0.0);
+
+  // Set IMU orientation (required for extraction to work properly)
+  interface_data.values[0] = 0.0;  // orientation x
+  interface_data.values[1] = 0.0;  // orientation y
+  interface_data.values[2] = 0.0;  // orientation z
+  interface_data.values[3] = 1.0;  // orientation w
+
+  // Set IMU gyroscope (indices 4-6)
+  interface_data.values[4] = 0.1;  // gyro x
+  interface_data.values[5] = 0.2;  // gyro y
+  interface_data.values[6] = 0.3;  // gyro z
+
+  // Set IMU accelerometer (indices 7-9)
+  // Simulate MuJoCo's behavior: negative z when standing
+  interface_data.values[7] = 0.5;   // accel x
+  interface_data.values[8] = -0.3; // accel y
+  interface_data.values[9] = -9.8;  // accel z (negative when standing)
+
+  // Set default joint positions
+  std::vector<double> default_positions(num_joints_, 0.0);
+  formatter_->set_default_joint_positions(default_positions);
+
+  // Set velocity commands
+  std::vector<double> velocity_commands(7, 0.0);
+  formatter_->set_velocity_commands(velocity_commands);
+
+  std::vector<double> previous_action(num_joints_, 0.0);
+
+  // Test 1: imu_upside_down = false (default, no inversion)
+  formatter_->set_imu_upside_down(false);
+  std::vector<float> observation_no_invert =
+    formatter_->format(interface_data, velocity_cmd, previous_action);
+
+  // Verify accelerometer values (indices 3-5)
+  // x-axis: 0.5 + 1.3 (bias) = 1.8
+  EXPECT_FLOAT_EQ(observation_no_invert[3], 1.8f);   // accel x + bias
+  EXPECT_FLOAT_EQ(observation_no_invert[4], -0.3f); // accel y (no change)
+  EXPECT_FLOAT_EQ(observation_no_invert[5], -9.8f);   // accel z (no inversion)
+
+  // Test 2: imu_upside_down = true (invert z-axis)
+  formatter_->set_imu_upside_down(true);
+  std::vector<float> observation_invert =
+    formatter_->format(interface_data, velocity_cmd, previous_action);
+
+  // Verify accelerometer values (indices 3-5)
+  // x-axis: 0.5 + 1.3 (bias) = 1.8 (unchanged)
+  EXPECT_FLOAT_EQ(observation_invert[3], 1.8f);   // accel x + bias (unchanged)
+  EXPECT_FLOAT_EQ(observation_invert[4], -0.3f);  // accel y (unchanged)
+  EXPECT_FLOAT_EQ(observation_invert[5], 9.8f);    // accel z (inverted: -(-9.8) = +9.8)
+
+  // Verify x and y are not affected by inversion
+  EXPECT_FLOAT_EQ(observation_no_invert[3], observation_invert[3]);
+  EXPECT_FLOAT_EQ(observation_no_invert[4], observation_invert[4]);
+  EXPECT_NE(observation_no_invert[5], observation_invert[5]);  // z should differ
+
+  // Verify gyroscope is not affected (indices 0-2)
+  EXPECT_FLOAT_EQ(observation_no_invert[0], observation_invert[0]);
+  EXPECT_FLOAT_EQ(observation_no_invert[1], observation_invert[1]);
+  EXPECT_FLOAT_EQ(observation_no_invert[2], observation_invert[2]);
+}
+
 int main(int argc, char ** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);

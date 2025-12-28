@@ -114,6 +114,11 @@ public:
   // Set velocity commands (7D: 3 for base + 4 for head)
   void set_velocity_commands(const std::vector<double> & commands);
 
+  // Set IMU upside down flag (inverts z-acceleration if true)
+  // MuJoCo accelerometer reports negative z when standing (ground pushes down in sensor frame)
+  // Set to true to invert z-axis to match expected +9.8 m/s² for standing robot
+  void set_imu_upside_down(bool upside_down) { imu_upside_down_ = upside_down; }
+
 private:
   // Extract interface data (IMU and joint states) from float64_values message
   void extract_interface_data(
@@ -147,6 +152,9 @@ private:
 
   // IMU sensor name (configurable via parameter, defaults to "imu_2")
   std::string imu_sensor_name_;
+
+  // IMU upside down flag (inverts z-acceleration if true)
+  bool imu_upside_down_;
 
   // Contact sensor names (configurable, defaults to common patterns)
   std::string left_foot_contact_sensor_name_;

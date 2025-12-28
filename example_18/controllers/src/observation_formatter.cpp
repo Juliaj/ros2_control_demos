@@ -35,6 +35,7 @@ ObservationFormatter::ObservationFormatter(
   default_joint_velocities_(num_joints_, 0.0),
   default_joint_velocities_set_(false),
   imu_sensor_name_(imu_sensor_name),
+  imu_upside_down_(false),
   left_foot_contact_sensor_name_("left_foot_contact"),
   right_foot_contact_sensor_name_("right_foot_contact"),
   contact_force_threshold_(5.0),  // 5N threshold for contact detection from FTS
@@ -96,14 +97,49 @@ std::vector<float> ObservationFormatter::format(
 
   // 2. IMU accelerometer (3D)
   // Apply bias to match MuJoCo training data (Playground, mujoco_infer.py line 74: accelerometer[0] += 1.3)
+  // If imu_upside_down is true, invert z-axis (MuJoCo reports negative z when standing)
   if (accelero.size() != 3)
   {
     throw std::runtime_error(
       "Accelerometer size mismatch: expected 3, got " + std::to_string(accelero.size()));
   }
+  
+  // Warn if accelerometer data appears to be uninitialized (all zeros except x-bias)
+  // This happens when interface data is incomplete at startup (count < 10)
+  static bool warned_about_zero_accel = false;
+  if (!warned_about_zero_accel && accelero[0] == 0.0 && accelero[1] == 0.0 && accelero[2] == 0.0)
+  {
+    auto logger = rclcpp::get_logger("observation_formatter");
+    RCLCPP_WARN(
+      logger,
+      "IMU accelerometer data is zero (interface data incomplete). "
+      "This is normal at startup but should resolve once state_interfaces_broadcaster publishes complete data. "
+      "Observation will show [1.3, 0.0, 0.0] until IMU data is available.");
+    warned_about_zero_accel = true;
+  }
+  
   observation.push_back(static_cast<float>(accelero[0] + 1.3));  // Apply x-axis bias
   observation.push_back(static_cast<float>(accelero[1]));
-  observation.push_back(static_cast<float>(accelero[2]));
+  // Invert z-acceleration if IMU is upside down (MuJoCo reports -9.8 when standing, should be +9.8)
+  float accel_z_processed = static_cast<float>(imu_upside_down_ ? -accelero[2] : accelero[2]);
+  
+  // Debug logging for z-acceleration inversion (throttled to avoid spam)
+  static rclcpp::Clock clock;
+  static bool logged_inversion_status = false;
+  if (!logged_inversion_status || (imu_upside_down_ && accelero[2] < -5.0))  // Log when z is very negative
+  {
+    auto logger = rclcpp::get_logger("observation_formatter");
+    RCLCPP_INFO_THROTTLE(
+      logger, clock, 2000,  // Log at most once every 2 seconds
+      "IMU z-acceleration: raw=%.4f, imu_upside_down=%s, processed=%.4f",
+      accelero[2], imu_upside_down_ ? "true" : "false", accel_z_processed);
+    if (imu_upside_down_ && accelero[2] < -5.0)
+    {
+      logged_inversion_status = true;  // Only log once after we see real data
+    }
+  }
+  
+  observation.push_back(accel_z_processed);
 
   // 3. Commands (7D: 3 base + 4 head)
   if (velocity_commands_.size() != 7)
@@ -148,8 +184,11 @@ std::vector<float> ObservationFormatter::format(
   }
 
   // 10. Feet contacts (2D)
-  observation.push_back(static_cast<float>(left_foot_contact_));
-  observation.push_back(static_cast<float>(right_foot_contact_));
+  double left_contact = left_foot_contact_;
+  double right_contact = right_foot_contact_;
+  
+  observation.push_back(static_cast<float>(left_contact));
+  observation.push_back(static_cast<float>(right_contact));
 
   // 11. Imitation phase (2D: cos, sin)
   observation.push_back(static_cast<float>(imitation_phase_[0]));
@@ -284,6 +323,12 @@ void ObservationFormatter::extract_interface_data(
     imu_accel_found[1] = true;
     imu_accel_found[2] = true;
   }
+  else
+  {
+    // Interface data incomplete - accelerometer will remain at initialized zeros [0, 0, 0]
+    // This causes observation to show [1.3, 0.0, 0.0] (x-bias applied to zero)
+    // This is normal at startup until state_interfaces_broadcaster publishes complete data
+  }
 
   // Extract joint positions (indices 10 to 10+num_joints_-1)
   const size_t joint_pos_start = 10;
@@ -338,7 +383,10 @@ void ObservationFormatter::extract_interface_data(
       RCLCPP_WARN(
         logger,
         "IMU accelerometer incomplete! Found: [%s, %s, %s]. "
-        "Looking for '%s/linear_acceleration.{x,y,z}'. Total interfaces checked: %zu",
+        "Looking for '%s/linear_acceleration.{x,y,z}' at indices 7-9. "
+        "Total interfaces available: %zu (expected at least 10). "
+        "Accelerometer values will be zero [0, 0, 0], resulting in observation [1.3, 0.0, 0.0] "
+        "until state_interfaces_broadcaster publishes complete data.",
         imu_accel_found[0] ? "yes" : "no", imu_accel_found[1] ? "yes" : "no",
         imu_accel_found[2] ? "yes" : "no", imu_sensor_name_.c_str(), count);
     }

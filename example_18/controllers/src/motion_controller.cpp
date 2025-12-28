@@ -160,7 +160,7 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
   std::string imu_sensor_name = get_node()->get_parameter("imu_sensor_name").as_string();
 
   // Read Open Duck Mini specific parameters
-  (void)get_node()->get_parameter("imu_upside_down").as_bool();  // Parameter read but not used
+  bool imu_upside_down = get_node()->get_parameter("imu_upside_down").as_bool();
   phase_frequency_factor_offset_ =
     get_node()->get_parameter("phase_frequency_factor_offset").as_double();
   phase_period_ = get_node()->get_parameter("phase_period").as_double();
@@ -168,6 +168,13 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
   // Initialize observation formatter
   observation_formatter_ = std::make_unique<ObservationFormatter>(joint_names_, imu_sensor_name);
   observation_formatter_->set_phase_period(phase_period_);
+  observation_formatter_->set_imu_upside_down(imu_upside_down);
+  
+  RCLCPP_INFO(
+    get_node()->get_logger(),
+    "IMU configuration: sensor_name='%s', imu_upside_down=%s (z-axis will be %s)",
+    imu_sensor_name.c_str(), imu_upside_down ? "true" : "false",
+    imu_upside_down ? "inverted" : "not inverted");
 
   // Read action_scale parameter
   double action_scale = get_node()->get_parameter("action_scale").as_double();
@@ -197,11 +204,22 @@ CallbackReturn MotionController::on_configure(const rclcpp_lifecycle::State & /*
     default_joint_positions_ = param_default_positions;
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
+    
+    RCLCPP_INFO(get_node()->get_logger(),
+      "\n[INIT] Default joint positions loaded from CONFIG (14 joints):");
+    for (size_t i = 0; i < std::min(default_joint_positions_.size(), size_t(14)); ++i)
+    {
+      RCLCPP_INFO(get_node()->get_logger(), "  Joint %zu (%s): %.4f rad", 
+        i, i < joint_names_.size() ? joint_names_[i].c_str() : "unknown", default_joint_positions_[i]);
+    }
   }
   else
   {
     // Will be set from sensor data on first update
     default_joint_positions_initialized_ = false;
+    RCLCPP_WARN(get_node()->get_logger(),
+      "default_joint_positions parameter size (%zu) != joint count (%zu). Will read from sensors on first update.",
+      param_default_positions.size(), joint_names_.size());
   }
 
   // Initialize joint position limits
@@ -368,6 +386,15 @@ return_type MotionController::update(
     observation_formatter_->set_default_joint_positions(default_joint_positions_);
     default_joint_positions_initialized_ = true;
 
+    // Log default positions for debugging
+    RCLCPP_INFO(get_node()->get_logger(),
+      "\n[INIT] Default joint positions set from SENSORS (14 joints):");
+    for (size_t i = 0; i < std::min(default_joint_positions_.size(), size_t(14)); ++i)
+    {
+      RCLCPP_INFO(get_node()->get_logger(), "  Joint %zu (%s): %.4f rad", 
+        i, i < joint_names_.size() ? joint_names_[i].c_str() : "unknown", default_joint_positions_[i]);
+    }
+
     // Initialize motor_targets and prev_motor_targets to default_joint_positions
     // Reference: validate_onnx_simulation.py lines 124-125
     motor_targets_ = default_joint_positions_;
@@ -376,7 +403,8 @@ return_type MotionController::update(
     observation_formatter_->set_motor_targets(motor_targets_);
   }
 
-  // Don't send any commands until at least one velocity command has been received
+  // Don't process policy until at least one velocity command has been received
+  // But still write motor_targets to maintain default pose
   if (!command_received_)
   {
     if (!prev_motor_targets_initialized_ && default_joint_positions_initialized_)
@@ -385,6 +413,15 @@ return_type MotionController::update(
       prev_motor_targets_ = default_joint_positions_;
       prev_motor_targets_initialized_ = true;
       observation_formatter_->set_motor_targets(motor_targets_);
+    }
+    
+    // Write motor_targets to hardware to maintain default pose even without command
+    if (prev_motor_targets_initialized_ && command_interfaces_.size() == motor_targets_.size())
+    {
+      for (size_t i = 0; i < command_interfaces_.size() && i < motor_targets_.size(); ++i)
+      {
+        (void)command_interfaces_[i].set_value(motor_targets_[i]);
+      }
     }
     return return_type::OK;
   }
@@ -448,35 +485,94 @@ return_type MotionController::update(
 
   // Log full observation breakdown matching compare_observations.py format
   // Reference: compare_observations.py lines 36-47
-  // Note: Logging every update (not throttled) to match Python behavior
-  if (model_inputs.size() >= 101)
+  // Log first 5 steps and every 25th step for detailed comparison
+  if (update_count_ % 25 == 0 || update_count_ < 5)
   {
+    // Get current joint positions for comparison
+    std::vector<double> current_joint_pos = observation_formatter_->extract_joint_positions(interface_data);
+    
     auto phase = observation_formatter_->get_imitation_phase();
     double imitation_i = observation_formatter_->get_imitation_i();
     double phase_period = observation_formatter_->get_phase_period();
+    
+    // Detailed observation logging matching Python format exactly
     RCLCPP_INFO(
       get_node()->get_logger(),
-      "\n[ROS2 OBS] Full observation (101 dims):\n"
-      "  gyro=[%.4f,%.4f,%.4f]\n"
-      "  accel=[%.4f,%.4f,%.4f] (x+1.3=%.4f)\n"
-      "  command=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f]\n"
-      "  joint_pos_rel[0:3]=[%.4f,%.4f,%.4f,%.4f] (left_hip)\n"
-      "  joint_vel[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
-      "  last_action[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
-      "  motor_targets[0:3]=[%.4f,%.4f,%.4f,%.4f]\n"
-      "  contacts=[%.4f,%.4f]\n"
-      "  phase=[%.4f,%.4f]\n"
+      "\n[ROS2 OBS] Full observation (101 dims) - Step %zu:\n"
+      "  gyro=[%.4f,%.4f,%.4f] (indices 0-2)\n"
+      "  accel=[%.4f,%.4f,%.4f] (x+1.3=%.4f) (indices 3-5)\n"
+      "  command=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 6-12)\n"
+      "  joint_pos[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (ABSOLUTE)\n"
+      "  joint_pos_rel[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 13-26)\n"
+      "  joint_vel[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 27-40)\n"
+      "  last_action[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 41-54)\n"
+      "  last_last_action[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 55-68)\n"
+      "  last_last_last_action[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 69-82)\n"
+      "  motor_targets[ALL 14]=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] (indices 83-96)\n"
+      "  contacts=[%.4f,%.4f] (indices 97-98)\n"
+      "  phase=[%.4f,%.4f] (indices 99-100)\n"
       "  imitation_i=%.1f, phase_period=%.1f",
-      model_inputs[0], model_inputs[1], model_inputs[2],  // gyro
-      model_inputs[3], model_inputs[4], model_inputs[5], model_inputs[3],  // accel (x should have +1.3)
-      model_inputs[6], model_inputs[7], model_inputs[8], model_inputs[9], model_inputs[10], model_inputs[11], model_inputs[12],  // commands
-      model_inputs[13], model_inputs[14], model_inputs[15], model_inputs[16],  // joint_pos_rel (left_hip_yaw,roll,pitch,knee)
-      model_inputs[27], model_inputs[28], model_inputs[29], model_inputs[30],  // joint_vel
-      model_inputs[41], model_inputs[42], model_inputs[43], model_inputs[44],  // last_action
-      model_inputs[69], model_inputs[70], model_inputs[71], model_inputs[72],  // motor_targets
-      model_inputs[83], model_inputs[84],  // contacts
-      model_inputs[85], model_inputs[86],  // phase
+      update_count_ + 1,
+      // Gyro (0-2)
+      model_inputs[0], model_inputs[1], model_inputs[2],
+      // Accel (3-5)
+      model_inputs[3], model_inputs[4], model_inputs[5], model_inputs[3],
+      // Commands (6-12)
+      model_inputs[6], model_inputs[7], model_inputs[8], model_inputs[9], model_inputs[10], model_inputs[11], model_inputs[12],
+      // Absolute joint positions (all 14)
+      current_joint_pos.size() > 0 ? current_joint_pos[0] : 0.0, current_joint_pos.size() > 1 ? current_joint_pos[1] : 0.0,
+      current_joint_pos.size() > 2 ? current_joint_pos[2] : 0.0, current_joint_pos.size() > 3 ? current_joint_pos[3] : 0.0,
+      current_joint_pos.size() > 4 ? current_joint_pos[4] : 0.0, current_joint_pos.size() > 5 ? current_joint_pos[5] : 0.0,
+      current_joint_pos.size() > 6 ? current_joint_pos[6] : 0.0, current_joint_pos.size() > 7 ? current_joint_pos[7] : 0.0,
+      current_joint_pos.size() > 8 ? current_joint_pos[8] : 0.0, current_joint_pos.size() > 9 ? current_joint_pos[9] : 0.0,
+      current_joint_pos.size() > 10 ? current_joint_pos[10] : 0.0, current_joint_pos.size() > 11 ? current_joint_pos[11] : 0.0,
+      current_joint_pos.size() > 12 ? current_joint_pos[12] : 0.0, current_joint_pos.size() > 13 ? current_joint_pos[13] : 0.0,
+      // Joint positions relative (13-26)
+      model_inputs[13], model_inputs[14], model_inputs[15], model_inputs[16], model_inputs[17], model_inputs[18],
+      model_inputs[19], model_inputs[20], model_inputs[21], model_inputs[22], model_inputs[23], model_inputs[24],
+      model_inputs[25], model_inputs[26],
+      // Joint velocities (27-40)
+      model_inputs[27], model_inputs[28], model_inputs[29], model_inputs[30], model_inputs[31], model_inputs[32],
+      model_inputs[33], model_inputs[34], model_inputs[35], model_inputs[36], model_inputs[37], model_inputs[38],
+      model_inputs[39], model_inputs[40],
+      // Last action (41-54)
+      model_inputs[41], model_inputs[42], model_inputs[43], model_inputs[44], model_inputs[45], model_inputs[46],
+      model_inputs[47], model_inputs[48], model_inputs[49], model_inputs[50], model_inputs[51], model_inputs[52],
+      model_inputs[53], model_inputs[54],
+      // Last last action (55-68)
+      model_inputs[55], model_inputs[56], model_inputs[57], model_inputs[58], model_inputs[59], model_inputs[60],
+      model_inputs[61], model_inputs[62], model_inputs[63], model_inputs[64], model_inputs[65], model_inputs[66],
+      model_inputs[67], model_inputs[68],
+      // Last last last action (69-82)
+      model_inputs[69], model_inputs[70], model_inputs[71], model_inputs[72], model_inputs[73], model_inputs[74],
+      model_inputs[75], model_inputs[76], model_inputs[77], model_inputs[78], model_inputs[79], model_inputs[80],
+      model_inputs[81], model_inputs[82],
+      // Motor targets (83-96)
+      model_inputs[83], model_inputs[84], model_inputs[85], model_inputs[86], model_inputs[87], model_inputs[88],
+      model_inputs[89], model_inputs[90], model_inputs[91], model_inputs[92], model_inputs[93], model_inputs[94],
+      model_inputs[95], model_inputs[96],
+      // Contacts (97-98)
+      model_inputs[97], model_inputs[98],
+      // Phase (99-100)
+      model_inputs[99], model_inputs[100],
       imitation_i, phase_period);
+    
+    // Summary statistics for quick comparison
+    double max_joint_pos_rel = 0.0;
+    double max_joint_vel = 0.0;
+    for (size_t i = 13; i <= 26 && i < model_inputs.size(); ++i)
+    {
+      max_joint_pos_rel = std::max(max_joint_pos_rel, std::abs(static_cast<double>(model_inputs[i])));
+    }
+    for (size_t i = 27; i <= 40 && i < model_inputs.size(); ++i)
+    {
+      max_joint_vel = std::max(max_joint_vel, std::abs(static_cast<double>(model_inputs[i])));
+    }
+    
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "[OBS SUMMARY] Step %zu: max_joint_pos_rel=%.4f, max_joint_vel=%.4f, contacts=[%.1f,%.1f], phase=[%.4f,%.4f]",
+      update_count_ + 1, max_joint_pos_rel, max_joint_vel, model_inputs[97], model_inputs[98], model_inputs[99], model_inputs[100]);
   }
 
   // Run model inference (returns relative joint positions)
@@ -506,20 +602,56 @@ return_type MotionController::update(
   // Store current action as previous for next iteration
   previous_action_ = model_outputs;
 
+  // Store original commands before clamping to detect clipping
+  std::vector<double> original_joint_commands = joint_commands;
+  std::vector<bool> clipped_by_velocity(joint_commands.size(), false);
+
   // Apply motor speed limits: prevent exceeding physical motor velocity capability
   // Reference: validate_onnx_simulation.py lines 221-226
+  // Note: Python code does NOT apply joint position limits, only motor velocity limits
+  const double max_change = prev_motor_targets_initialized_ ? max_motor_velocity_ * actual_control_period : 0.0;
   if (prev_motor_targets_initialized_)
   {
-    const double max_change = max_motor_velocity_ * actual_control_period;
-    
     for (size_t i = 0; i < joint_commands.size(); ++i)
     {
+      const double original = joint_commands[i];
       // Clamp joint command to prevent exceeding motor velocity limit
       joint_commands[i] = std::clamp(
         joint_commands[i],
         prev_motor_targets_[i] - max_change,
         prev_motor_targets_[i] + max_change
       );
+      if (joint_commands[i] != original)
+      {
+        clipped_by_velocity[i] = true;
+      }
+    }
+  }
+  
+  // Log clipping events (throttled to avoid spam)
+  static int clip_log_counter = 0;
+  if (++clip_log_counter % 25 == 0)  // Log every 25 updates
+  {
+    bool any_velocity_clip = false;
+    for (size_t i = 0; i < clipped_by_velocity.size(); ++i)
+    {
+      if (clipped_by_velocity[i])
+      {
+        any_velocity_clip = true;
+        RCLCPP_WARN_THROTTLE(
+          get_node()->get_logger(), *get_node()->get_clock(), 1000,
+          "[CLIP] Joint '%s' clipped by VELOCITY limit: requested=%.4f, clamped=%.4f, prev=%.4f, max_change=%.4f",
+          i < joint_names_.size() ? joint_names_[i].c_str() : "unknown",
+          original_joint_commands[i], joint_commands[i], 
+          prev_motor_targets_initialized_ ? prev_motor_targets_[i] : 0.0,
+          max_change);
+      }
+    }
+    if (!any_velocity_clip && update_count_ % 125 == 0)  // Less frequent "all OK" message
+    {
+      RCLCPP_DEBUG_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 5000,
+        "[CLIP] No joint commands clipped by velocity limit (step %zu)", update_count_ + 1);
     }
   }
   
@@ -532,28 +664,45 @@ return_type MotionController::update(
   // Reference: compare_observations.py lines 84-88
   if (update_count_ % 25 == 0)
   {
+    // Extract contact values from model_inputs (indices 97-98 based on ObservationFormatter)
+    double contact_left_debug = model_inputs.size() > 97 ? model_inputs[97] : -1.0;
+    double contact_right_debug = model_inputs.size() > 98 ? model_inputs[98] : -1.0;
+    
     RCLCPP_INFO(
       get_node()->get_logger(),
       "\n[STEP %zu] Policy update #%zu\n"
       "  Command: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n"
-      "  Action[0:3]: %.4f, %.4f, %.4f, %.4f\n"
-      "  Motor targets[0:3]: %.4f, %.4f, %.4f, %.4f",
+      "  Contacts: L=%.1f R=%.1f\n"
+      "  Action (all 14): [%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f]\n"
+      "  Motor targets (all 14): [%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f]\n"
+      "  Max velocity change allowed: %.4f rad (over %.4f s)",
       update_count_ + 1, update_count_ + 1,
       velocity_commands_7d[0], velocity_commands_7d[1], velocity_commands_7d[2],
       velocity_commands_7d[3], velocity_commands_7d[4], velocity_commands_7d[5], velocity_commands_7d[6],
-      model_outputs.size() > 0 ? model_outputs[0] : 0.0,
-      model_outputs.size() > 1 ? model_outputs[1] : 0.0,
-      model_outputs.size() > 2 ? model_outputs[2] : 0.0,
-      model_outputs.size() > 3 ? model_outputs[3] : 0.0,
-      motor_targets_.size() > 0 ? motor_targets_[0] : 0.0,
-      motor_targets_.size() > 1 ? motor_targets_[1] : 0.0,
-      motor_targets_.size() > 2 ? motor_targets_[2] : 0.0,
-      motor_targets_.size() > 3 ? motor_targets_[3] : 0.0);
+      contact_left_debug, contact_right_debug,
+      // All 14 actions (model_outputs)
+      model_outputs.size() > 0 ? model_outputs[0] : 0.0, model_outputs.size() > 1 ? model_outputs[1] : 0.0,
+      model_outputs.size() > 2 ? model_outputs[2] : 0.0, model_outputs.size() > 3 ? model_outputs[3] : 0.0,
+      model_outputs.size() > 4 ? model_outputs[4] : 0.0, model_outputs.size() > 5 ? model_outputs[5] : 0.0,
+      model_outputs.size() > 6 ? model_outputs[6] : 0.0, model_outputs.size() > 7 ? model_outputs[7] : 0.0,
+      model_outputs.size() > 8 ? model_outputs[8] : 0.0, model_outputs.size() > 9 ? model_outputs[9] : 0.0,
+      model_outputs.size() > 10 ? model_outputs[10] : 0.0, model_outputs.size() > 11 ? model_outputs[11] : 0.0,
+      model_outputs.size() > 12 ? model_outputs[12] : 0.0, model_outputs.size() > 13 ? model_outputs[13] : 0.0,
+      // All 14 motor targets (joint_commands after processing)
+      motor_targets_.size() > 0 ? motor_targets_[0] : 0.0, motor_targets_.size() > 1 ? motor_targets_[1] : 0.0,
+      motor_targets_.size() > 2 ? motor_targets_[2] : 0.0, motor_targets_.size() > 3 ? motor_targets_[3] : 0.0,
+      motor_targets_.size() > 4 ? motor_targets_[4] : 0.0, motor_targets_.size() > 5 ? motor_targets_[5] : 0.0,
+      motor_targets_.size() > 6 ? motor_targets_[6] : 0.0, motor_targets_.size() > 7 ? motor_targets_[7] : 0.0,
+      motor_targets_.size() > 8 ? motor_targets_[8] : 0.0, motor_targets_.size() > 9 ? motor_targets_[9] : 0.0,
+      motor_targets_.size() > 10 ? motor_targets_[10] : 0.0, motor_targets_.size() > 11 ? motor_targets_[11] : 0.0,
+      motor_targets_.size() > 12 ? motor_targets_[12] : 0.0, motor_targets_.size() > 13 ? motor_targets_[13] : 0.0,
+      max_motor_velocity_ * actual_control_period, actual_control_period);
   }
 
   // Write joint commands to hardware interfaces
   // Reference: validate_onnx_simulation.py line 228/273: self.data.ctrl = self.motor_targets.copy()
   // Note: Python reference does not apply joint position limits, only motor velocity limits
+  size_t write_success_count = 0;
   for (size_t i = 0; i < command_interfaces_.size() && i < joint_commands.size(); ++i)
   {
     const bool write_success = command_interfaces_[i].set_value(joint_commands[i]);
@@ -564,6 +713,19 @@ return_type MotionController::update(
         "Failed to set command for joint '%s' to %.6f",
         joint_names_[i].c_str(), joint_commands[i]);
     }
+    else
+    {
+      write_success_count++;
+    }
+  }
+
+  // Log command write status every 100 updates
+  if (update_count_ % 100 == 0)
+  {
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "[CMD WRITE] Successfully wrote %zu/%zu joint commands",
+      write_success_count, command_interfaces_.size());
   }
 
   update_count_++;

@@ -126,6 +126,20 @@ install(
   DIRECTORY bringup/
   DESTINATION share/ros2_control_demo_example_18
 )
+# Install fine_tuning directory (excluding launch file to avoid duplicate)
+install(
+  DIRECTORY fine_tuning/
+  DESTINATION share/ros2_control_demo_example_18/fine_tuning
+  FILES_MATCHING
+  PATTERN "*.py"
+  PATTERN "data_collection.launch.py" EXCLUDE
+  PATTERN "*.md"
+)
+# Install launch file to launch/ directory for ros2 launch to find it
+install(
+  FILES fine_tuning/data_collection.launch.py
+  DESTINATION share/ros2_control_demo_example_18/launch
+)
 install(
   DIRECTORY description/
   DESTINATION share/ros2_control_demo_example_18/description
@@ -177,6 +191,14 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_action_processor
     action_processor
+  )
+
+  # Unit tests for MotionController initialization
+  ament_add_gtest(test_motion_controller_initialization
+    controllers/test/test_motion_controller_initialization.cpp
+  )
+  target_include_directories(test_motion_controller_initialization PRIVATE
+    ${PROJECT_SOURCE_DIR}/controllers/include
   )
 
   # Unit tests for ONNX shape handling
@@ -266,6 +288,7 @@ if(BUILD_TESTING)
       DEPENDS
         test_observation_formatter
         test_action_processor
+        test_motion_controller_initialization
         test_onnx_shape_handling
         test_motion_controller_mujoco
     )
@@ -275,6 +298,7 @@ if(BUILD_TESTING)
       DEPENDS
         test_observation_formatter
         test_action_processor
+        test_motion_controller_initialization
         test_onnx_shape_handling
     )
   endif()
