@@ -6,43 +6,6 @@ Overview
 
 This document outlines the plan for fine-tuning MuJoCo-trained models for deployment in ROS2 control environment (example_18). Models trained in MuJoCo simulation fail in ROS2 due to observation distribution shift, but can be adapted through fine-tuning on ROS2-compatible data.
 
-
-**Dependencies**:
-.. code-block:: bash
-
-   sudo apt install python3-h5py python3-numpy
-
-**Quick Start Commands**:
-.. code-block:: bash
-
-   # 1. Launch data collection mode (launches MuJoCo internally via ros2_control_node)
-   ros2 launch ros2_control_demo_example_18 data_collection.launch.py
-
-   # Note: MuJoCo simulation is started automatically by the launch file.
-   # If you want a separate MuJoCo GUI window, you can optionally start it first:
-   # Option A: Using pixi (sets MUJOCO_DIR automatically)
-   #   cd ~/ros2_ws/src/mujoco_ros2_control
-   #   pixi shell
-   #   cd ~/ros2_ws
-   #   ${MUJOCO_DIR}/bin/simulate src/ros-controls/ros2_control_demos/example_18/description/mujoco/scene.xml
-   # Option B: Using full path (no pixi needed)
-   #   cd ~/ros2_ws
-   #   ~/ros2_ws/src/mujoco_ros2_control/mujoco/mujoco-3.4.0/bin/simulate \
-   #     src/ros-controls/ros2_control_demos/example_18/description/mujoco/scene.xml
-
-   # 2. Publish velocity commands (optional, in separate terminal)
-   # From source directory:
-   cd ~/ros2_ws
-   python3 src/ros-controls/ros2_control_demos/example_18/fine_tuning/publish_velocity_commands.py --lin-vel-x 0.15 --duration 300
-   # Or use installed script:
-   # python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/fine_tuning/publish_velocity_commands.py --lin-vel-x 0.15 --duration 300
-
-   # 3. Collect data (in separate terminal)
-   # From source directory:
-   cd ~/ros2_ws
-   python3 src/ros-controls/ros2_control_demos/example_18/fine_tuning/collect_ros2_data.py --output ros2_data.h5 --duration 300 --publish-commands
-   # Or use installed script:
-   # python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/fine_tuning/collect_ros2_data.py --output ros2_data.h5 --duration 300 --publish-commands
 Problem Statement
 -----------------
 

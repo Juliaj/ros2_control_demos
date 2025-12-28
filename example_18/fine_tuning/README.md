@@ -49,18 +49,11 @@ There are two options for data collection:
 Manually drive the robot using keyboard controls while the ONNX model generates actions:
 
 ```bash
-# From source directory
-cd ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18
-python3 fine_tuning/manual_control_ros2.py \
-    --onnx-model /path/to/model.onnx \
-    --output ros2_manual_data.h5 \
-    --num-joints 14
 
-# Or use installed script
-python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/fine_tuning/manual_control_ros2.py \
-    --onnx-model /path/to/model.onnx \
-    --output ros2_manual_data.h5 \
-    --num-joints 14
+# use the Mujoco trained model as a base
+cd /home/juliajia/dev/Open_Duck_Playground
+uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/fine_tuning/manual_control_ros2.py   --output mujoco_manual_data.h5   --onnx-model ~/dev/Open_Duck_Playground/checkpoints/2025_12_26_165635_300482560.onnx
+
 ```
 
 **Controls:**
@@ -80,25 +73,6 @@ python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_
 - Publish joint commands to `/forward_command_controller/commands`
 - Save observations and actions to HDF5 file
 
-#### Option B: Reference Motion (`collect_ros2_data.py`)
-
-Use pre-recorded reference motion to drive the robot:
-
-```bash
-# From source directory
-cd ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18
-python3 fine_tuning/collect_ros2_data.py --output ros2_data.h5 --duration 300 --publish-commands
-
-# Or use installed script
-python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/fine_tuning/collect_ros2_data.py --output ros2_data.h5 --duration 300 --publish-commands
-```
-
-**The script will:**
-- Subscribe to `/state_interfaces_broadcaster/values` (observations)
-- Subscribe to `/motion_controller/cmd_vel` (velocity commands)
-- Generate actions using reference motion (polynomial_coefficients.pkl)
-- Publish joint commands to `/forward_command_controller/commands`
-- Save observations and actions to HDF5 file
 
 ## Data Format
 

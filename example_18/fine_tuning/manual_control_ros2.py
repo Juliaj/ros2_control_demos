@@ -98,10 +98,16 @@ class ManualControlROS2(Node):
         self.get_logger().info(f"Loaded ONNX model: {onnx_model_path}")
 
         # Control parameters
-        self.action_scale = 0.25
+        # Original value from MuJoCo training: 0.25
+        # Slightly increased to allow larger leg movements for proper stepping
+        self.action_scale = 0.3
         self.dof_vel_scale = 0.05
-        self.max_motor_velocity = 5.24  # rad/s
+        # Original value from MuJoCo training: 5.24 rad/s
+        # Moderately increased to allow faster joint movements for quicker gait execution
+        self.max_motor_velocity = 8.0  # rad/s
         self.control_period = 0.02  # 50Hz
+        # Gyro deadband to filter out small drift/noise that causes unwanted turning
+        self.gyro_deadband = 0.15  # rad/s - values below this are set to zero
         
         # Home keyframe joint positions from scene.xml
         # Format: [left_hip_yaw, left_hip_roll, left_hip_pitch, left_knee, left_ankle,
@@ -133,6 +139,9 @@ class ManualControlROS2(Node):
         self.motor_targets = np.zeros(num_joints)
         self.prev_motor_targets = None
         self.prev_motor_targets_initialized = False
+        self.use_real_contacts = False
+        self.left_contact_sensor = 0.0
+        self.right_contact_sensor = 0.0
 
         # Stabilization and blend-in
         self.stabilization_steps = 0
@@ -181,16 +190,25 @@ class ManualControlROS2(Node):
             10
         )
         
-        # Wait a bit for subscribers to connect
-        time.sleep(0.5)
-        subscriber_count = self.joint_cmd_pub.get_subscription_count()
+        # Wait for subscribers to connect (controller may take time to start)
+        max_wait_time = 3.0  # Wait up to 3 seconds
+        wait_interval = 0.1
+        waited = 0.0
+        subscriber_count = 0
+        while waited < max_wait_time:
+            subscriber_count = self.joint_cmd_pub.get_subscription_count()
+            if subscriber_count > 0:
+                break
+            time.sleep(wait_interval)
+            waited += wait_interval
+        
         if subscriber_count == 0:
             self.get_logger().warn(
-                "WARNING: No subscribers to /forward_command_controller/commands. "
-                "Make sure forward_command_controller is running!"
+                "WARNING: No subscribers to /forward_command_controller/commands after {:.1f}s. "
+                "Make sure forward_command_controller is running in the launch file!".format(waited)
             )
         else:
-            self.get_logger().info(f"forward_command_controller connected ({subscriber_count} subscriber(s))")
+            self.get_logger().info(f"forward_command_controller connected ({subscriber_count} subscriber(s)) after {waited:.1f}s")
 
         # Keyboard input setup
         self.old_settings = termios.tcgetattr(sys.stdin)
@@ -380,6 +398,8 @@ class ManualControlROS2(Node):
 
         # Extract IMU data
         gyro = np.array([msg.values[4], msg.values[5], msg.values[6]])
+        # Apply deadband to filter out small drift/noise
+        gyro = np.where(np.abs(gyro) < self.gyro_deadband, 0.0, gyro)
         accelero = np.array([msg.values[7], msg.values[8], msg.values[9]])
 
         # Extract joint positions and velocities
@@ -387,6 +407,33 @@ class ManualControlROS2(Node):
         joint_vel_start = 10 + self.num_joints
         joint_positions = np.array(msg.values[joint_pos_start:joint_pos_start + self.num_joints])
         joint_velocities = np.array(msg.values[joint_vel_start:joint_vel_start + self.num_joints])
+        
+        # Extract contact sensors (indices 10 + 2*num_joints)
+        # Note: Model was trained with phase-based contacts, so we use phase-based by default for stability
+        # Real contact sensors are extracted but not used unless explicitly enabled
+        contact_start = 10 + 2 * self.num_joints
+        if len(msg.values) >= contact_start + 2:
+            self.left_contact_sensor = float(msg.values[contact_start])
+            self.right_contact_sensor = float(msg.values[contact_start + 1])
+        else:
+            self.left_contact_sensor = 0.0
+            self.right_contact_sensor = 0.0
+        
+        # Always use phase-based contacts (model was trained with this)
+        # Set self.use_real_contact_sensors = True in __init__ to enable real sensors (experimental)
+        if hasattr(self, 'use_real_contact_sensors') and self.use_real_contact_sensors:
+            # Validate sensor values are in reasonable range
+            if 0.0 <= self.left_contact_sensor <= 1.0 and 0.0 <= self.right_contact_sensor <= 1.0:
+                self.use_real_contacts = True
+            else:
+                self.use_real_contacts = False
+                if self.stabilization_steps == 1:  # Warn once
+                    self.get_logger().warn(
+                        f"Contact sensor values out of range: [{self.left_contact_sensor}, {self.right_contact_sensor}]. "
+                        "Using phase-based estimation."
+                    )
+        else:
+            self.use_real_contacts = False
         
         # Extract base linear velocity from velocimeter sensor (indices 40-42)
         # If velocimeter data is available, use it; otherwise use zeros
@@ -455,7 +502,8 @@ class ManualControlROS2(Node):
                 self.imitation_i = self.imitation_i % self.phase_period
                 
                 # Format observation
-                observation = self.format_observation(gyro, accelero, joint_positions, joint_velocities)
+                observation = self.format_observation(gyro, accelero, joint_positions, joint_velocities, 
+                                                       self.left_contact_sensor, self.right_contact_sensor)
 
                 # Get action from ONNX model
                 model_action = self.policy.infer(observation)
@@ -466,11 +514,15 @@ class ManualControlROS2(Node):
                 # Debug: log action statistics occasionally
                 if self.stabilization_steps % 50 == 0:
                     blend_factor = min(1.0, self.onnx_active_steps / self.onnx_blend_in_steps)
+                    contact_info = f"contacts=[{self.left_contact_sensor:.3f}, {self.right_contact_sensor:.3f}]" if self.use_real_contacts else "contacts=phase_est"
                     self.get_logger().info(
                         f"ONNX active: step={self.stabilization_steps}, active_steps={self.onnx_active_steps}, "
                         f"blend_factor={blend_factor:.3f}, "
                         f"action_range=[{np.min(model_action):.3f}, {np.max(model_action):.3f}], "
-                        f"vel_cmd={self.current_velocity_command[:3]}"
+                        f"vel_cmd={self.current_velocity_command[:3]}, "
+                        f"gyro=[{gyro[0]:.3f}, {gyro[1]:.3f}, {gyro[2]:.3f}], "
+                        f"base_vel=[{base_linear_velocity[0]:.3f}, {base_linear_velocity[1]:.3f}, {base_linear_velocity[2]:.3f}], "
+                        f"{contact_info}"
                     )
 
                 # Convert action to motor targets
@@ -540,7 +592,8 @@ class ManualControlROS2(Node):
             self.last_last_action = self.last_action.copy()
             self.last_action = model_action.copy()
 
-    def format_observation(self, gyro, accelero, joint_positions, joint_velocities):
+    def format_observation(self, gyro, accelero, joint_positions, joint_velocities, 
+                           left_contact_sensor, right_contact_sensor):
         """Format observation exactly as observation_formatter.cpp does."""
         obs = []
 
@@ -570,16 +623,23 @@ class ManualControlROS2(Node):
         # 9. Motor targets (N)
         obs.extend(self.motor_targets.tolist())
 
-        # 10. Feet contacts (2D) - estimate from phase
-        # If sin(phase) > 0: left contact, if sin(phase) < 0: right contact
+        # Calculate phase for imitation phase encoding (always needed)
         phase_theta = (self.imitation_i / self.phase_period) * 2.0 * np.pi
         sin_phase = np.sin(phase_theta)
-        left_contact = 1.0 if sin_phase > 0.0 else 0.0
-        right_contact = 1.0 if sin_phase < 0.0 else 0.0
+        cos_phase = np.cos(phase_theta)
+
+        # 10. Feet contacts (2D) - use real sensors if available, otherwise estimate from phase
+        if self.use_real_contacts:
+            # Use real contact sensor values (thresholded to 0/1)
+            left_contact = 1.0 if left_contact_sensor > 0.5 else 0.0
+            right_contact = 1.0 if right_contact_sensor > 0.5 else 0.0
+        else:
+            # Fallback to phase-based estimation
+            left_contact = 1.0 if sin_phase > 0.0 else 0.0
+            right_contact = 1.0 if sin_phase < 0.0 else 0.0
         obs.extend([left_contact, right_contact])
 
         # 11. Imitation phase (2D) - cos/sin encoding
-        cos_phase = np.cos(phase_theta)
         obs.extend([cos_phase, sin_phase])
 
         return np.array(obs, dtype=np.float32)
