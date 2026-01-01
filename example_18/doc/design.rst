@@ -15,6 +15,78 @@ The system consists of two main components:
 
 2. LocomotionController: A ros2_control controller that subscribes to sensor data and velocity commands, formats observations, runs ONNX inference, and writes joint position commands to hardware.
 
+
+Challenges:
+
+Scenario 1: Python inference in Mujoco directly: The robot walks forward.
+
+.. raw:: html
+
+   <video width="640" height="480" controls>
+     <source src="imgs/python_mujoco.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+
+`Video: python_mujoco.mp4 <imgs/python_mujoco.mp4>`_
+
+Terminal 1:
+
+.. code-block:: bash
+
+   uv run python tests/validate_onnx_simulation.py --onnx checkpoints/2025_12_26_165635_300482560.onnx --viewer --fall-duration-steps 5000
+
+Scenario 2: forward_command_controller in mujoco_ros2_control simulation with Python inference code, duck walks forward somehow but in circles.
+
+.. raw:: html
+
+   <video width="640" height="480" controls>
+     <source src="imgs/forward_command_controller_mujoco.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+
+`Video: forward_command_controller_mujoco.mp4 <imgs/forward_command_controller_mujoco.mp4>`_
+
+Commands:
+
+Terminal 1:
+
+.. code-block:: bash
+
+   ros2 launch ros2_control_demo_example_18 data_collection.launch.py
+
+Terminal 2:
+
+.. code-block:: bash
+
+   uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/fine_tuning/manual_control_ros2.py \
+     --output mujoco_manual_data.h5 \
+     --onnx-model ~/dev/Open_Duck_Playground/checkpoints/2025_12_26_165635_300482560.onnx
+
+Scenario 3: Motion controller in mujoco_ros2_control, action is driven by MotionController: The robot doesn't walk forward, rather moves its feet in place.
+
+.. raw:: html
+
+   <video width="640" height="480" controls>
+     <source src="imgs/motion_controller_mujoco.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+
+`Video: motion_controller_mujoco.mp4 <imgs/motion_controller_mujoco.mp4>`_
+
+Terminal 1:
+
+.. code-block:: bash
+
+   ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py
+
+Terminal 2:
+
+.. code-block:: bash
+
+   python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/launch/test_motions.py
+
+
+
 Data Flow
 ---------
 
