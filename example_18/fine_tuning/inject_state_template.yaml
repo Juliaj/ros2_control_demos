@@ -1,0 +1,171 @@
+# Template YAML file for state injection into C++ motion controller
+# 
+# This file contains all data needed to inject state from Python code path
+# into C++ motion controller for debugging and comparison.
+#
+# Usage:
+#   1. Capture data from Python code path (manual_control_ros2.py)
+#   2. Fill in this template with captured values
+#   3. Call injection service: ros2 service call /motion_controller/inject_state std_srvs/srv/SetBool "{data: true, message: '/path/to/this/file.yaml'}"
+
+# Interface data from hardware/MuJoCo (Float64Values message format)
+# Expected size: 10 (IMU) + 2*N (joint positions + velocities) + 2 (contacts) + 3 (velocimeter) = 43 for 14 joints
+# Order: [0-3: IMU quaternion, 4-6: gyro, 7-9: accelero, 10-23: joint positions, 24-37: joint velocities, 38-39: contacts, 40-42: velocimeter]
+interface_data:
+  values:
+    # IMU quaternion (4 values, indices 0-3) - typically [1, 0, 0, 0] for no rotation
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    # IMU gyroscope (3 values, indices 4-6): angular velocity in rad/s
+    - 0.0  # x
+    - 0.0  # y
+    - 0.0  # z
+    # IMU accelerometer (3 values, indices 7-9): linear acceleration in m/s²
+    - 0.0  # x
+    - 0.0  # y
+    - -9.8  # z (MuJoCo reports -9.8 when standing, will be inverted if imu_upside_down=true)
+    # Joint positions (14 values, indices 10-23): absolute joint positions in radians
+    # Order: left_hip_yaw, left_hip_roll, left_hip_pitch, left_knee, left_ankle,
+    #        neck_pitch, head_pitch, head_yaw, head_roll,
+    #        right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle
+    - 0.002   # left_hip_yaw
+    - 0.053   # left_hip_roll
+    - -0.63   # left_hip_pitch
+    - 1.368   # left_knee
+    - -0.784  # left_ankle
+    - 0.0     # neck_pitch
+    - 0.0     # head_pitch
+    - 0.0     # head_yaw
+    - 0.0     # head_roll
+    - -0.003  # right_hip_yaw
+    - -0.065  # right_hip_roll
+    - 0.635   # right_hip_pitch
+    - 1.379   # right_knee
+    - -0.796  # right_ankle
+    # Joint velocities (14 values, indices 24-37): raw joint velocities in rad/s
+    # Same order as positions
+    - 0.0  # left_hip_yaw
+    - 0.0  # left_hip_roll
+    - 0.0  # left_hip_pitch
+    - 0.0  # left_knee
+    - 0.0  # left_ankle
+    - 0.0  # neck_pitch
+    - 0.0  # head_pitch
+    - 0.0  # head_yaw
+    - 0.0  # head_roll
+    - 0.0  # right_hip_yaw
+    - 0.0  # right_hip_roll
+    - 0.0  # right_hip_pitch
+    - 0.0  # right_knee
+    - 0.0  # right_ankle
+    # Contact sensors (2 values, indices 38-39): binary contact values (0.0 or 1.0)
+    - 0.0  # left_foot_contact
+    - 0.0  # right_foot_contact
+    # Velocimeter (3 values, indices 40-42): base linear velocity in m/s
+    - 0.0  # x
+    - 0.0  # y
+    - 0.0  # z
+
+# Controller internal state needed for observation formatting and command generation
+controller_state:
+  # Action history (3 previous actions, each 14 values)
+  # These are the last 3 actions output by the model (relative joint positions)
+  last_action:
+    # Last action (14 values): most recent model output
+    - 0.0  # left_hip_yaw
+    - 0.0  # left_hip_roll
+    - 0.0  # left_hip_pitch
+    - 0.0  # left_knee
+    - 0.0  # left_ankle
+    - 0.0  # neck_pitch
+    - 0.0  # head_pitch
+    - 0.0  # head_yaw
+    - 0.0  # head_roll
+    - 0.0  # right_hip_yaw
+    - 0.0  # right_hip_roll
+    - 0.0  # right_hip_pitch
+    - 0.0  # right_knee
+    - 0.0  # right_ankle
+  
+  last_last_action:
+    # Last-last action (14 values): second most recent model output
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  
+  last_last_last_action:
+    # Last-last-last action (14 values): third most recent model output
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  
+  # Motor targets (14 values): current joint position commands sent to hardware
+  # Same order as joint positions
+  motor_targets:
+    - 0.002   # left_hip_yaw
+    - 0.053   # left_hip_roll
+    - -0.63   # left_hip_pitch
+    - 1.368   # left_knee
+    - -0.784  # left_ankle
+    - 0.0     # neck_pitch
+    - 0.0     # head_pitch
+    - 0.0     # head_yaw
+    - 0.0     # head_roll
+    - -0.003  # right_hip_yaw
+    - -0.065  # right_hip_roll
+    - 0.635   # right_hip_pitch
+    - 1.379   # right_knee
+    - -0.796  # right_ankle
+  
+  # Imitation phase counter: gait phase position (0 to phase_period, typically 100.0)
+  # Used to compute cos/sin encoding for observation
+  imitation_i: 0.0
+  
+  # Previous motor targets (14 values): used for rate limiting
+  # Same order as motor_targets
+  prev_motor_targets:
+    - 0.002
+    - 0.053
+    - -0.63
+    - 1.368
+    - -0.784
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - -0.003
+    - -0.065
+    - 0.635
+    - 1.379
+    - -0.796
+  
+  # ONNX active steps: number of steps since ONNX started (for blend factor calculation)
+  onnx_active_steps: 200
+  
+  # Stabilization steps: number of stabilization steps completed
+  stabilization_steps: 200
+

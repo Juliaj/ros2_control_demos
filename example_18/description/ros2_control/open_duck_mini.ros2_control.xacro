@@ -1,0 +1,242 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!--
+    Open Duck Mini ros2_control configuration
+    Supports both MuJoCo and mock hardware
+    Total: 14 DoF (10 leg + 4 head)
+
+    Joint order matches example_config.json joints_offsets (lines 13-28):
+    0-4:   Left leg (hip_yaw, hip_roll, hip_pitch, knee, ankle)
+    5-8:   Head (neck_pitch, head_pitch, head_yaw, head_roll)
+    9-13:  Right leg (hip_yaw, hip_roll, hip_pitch, knee, ankle)
+
+    IMU sensor: imu (10 state interfaces: orientation + angular_velocity + linear_acceleration)
+  -->
+
+  <xacro:macro name="open_duck_mini_mujoco_ros2_control" params="name prefix">
+    <xacro:open_duck_mini_ros2_control name="${name}" prefix="${prefix}" use_mock_hardware="false"/>
+  </xacro:macro>
+
+  <xacro:macro name="open_duck_mini_ros2_control" params="name prefix use_mock_hardware:=^|false">
+    <ros2_control name="${name}" type="system">
+      <xacro:unless value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
+          <param name="mujoco_model">$(find ros2_control_demo_example_18)/description/mujoco/scene.xml</param>
+          <param name="meshdir">$(find ros2_control_demo_example_18)/description/assets</param>
+          <!-- DISABLED: Using MuJoCo's built-in position actuators (kp=13.37) instead of external PID -->
+          <!-- External PID adds loop delay and numerical differences compared to Python reference -->
+          <!-- <param name="pids_config_file">$(find ros2_control_demo_example_18)/config/open_duck_mini_pids.yaml</param> -->
+          <!-- Initialize robot from "home" keyframe to match reference implementation -->
+          <!-- Source: scene_flat_terrain.xml keyframe "home" -->
+          <param name="override_start_position_file">$(find ros2_control_demo_example_18)/description/mujoco/start_positions.xml</param>
+        </hardware>
+      </xacro:unless>
+      <xacro:if value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </hardware>
+      </xacro:if>
+
+      <!-- Left leg joints -->
+      <!-- Order matches example_config.json joints_offsets (lines 14-18) -->
+      <joint name="${prefix}left_hip_yaw">
+        <command_interface name="position">
+          <!-- Joint limits set to very large values for data collection - reference motion may exceed URDF limits -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}left_hip_roll">
+        <command_interface name="position">
+          <!-- Joint limits set to very large values for data collection -->
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}left_hip_pitch">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}left_knee">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}left_ankle">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+
+      <!-- Head joints (4 DoF) -->
+      <!-- Order matches example_config.json joints_offsets (lines 19-22) -->
+      <!-- These joints receive additional head commands via velocity_commands[3:7] -->
+      <!-- Source: v2_rl_walk_mujoco.py lines 310-311, biped_robot_controllers.yaml head_joint_indices -->
+      <joint name="${prefix}neck_pitch">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}head_pitch">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}head_yaw">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}head_roll">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+
+      <!-- Right leg joints -->
+      <!-- Order matches example_config.json joints_offsets (lines 23-27) -->
+      <joint name="${prefix}right_hip_yaw">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}right_hip_roll">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}right_hip_pitch">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}right_knee">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="${prefix}right_ankle">
+        <command_interface name="position">
+          <param name="min">-10.0</param>
+          <param name="max">10.0</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+
+      <!-- IMU sensor - matches Playground sensor names -->
+      <!-- MuJoCo sensors: orientation (framequat), gyro, accelerometer -->
+      <!-- For mock hardware, sensor interfaces are still available but will return default values -->
+      <sensor name="${prefix}imu">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">imu</param>
+          <param name="mujoco_orientation_sensor">orientation</param>
+          <param name="mujoco_gyro_sensor">gyro</param>
+          <param name="mujoco_accel_sensor">accelerometer</param>
+        </xacro:unless>
+        <state_interface name="orientation.w"/>
+        <state_interface name="orientation.x"/>
+        <state_interface name="orientation.y"/>
+        <state_interface name="orientation.z"/>
+        <state_interface name="angular_velocity.x"/>
+        <state_interface name="angular_velocity.y"/>
+        <state_interface name="angular_velocity.z"/>
+        <state_interface name="linear_acceleration.x"/>
+        <state_interface name="linear_acceleration.y"/>
+        <state_interface name="linear_acceleration.z"/>
+      </sensor>
+
+      <!-- Velocimeter sensor - base linear velocity in local frame -->
+      <!-- MuJoCo sensor: velocimeter (local_linvel) -->
+      <!-- Provides 3D linear velocity of the base in the local frame -->
+      <sensor name="${prefix}velocimeter">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">velocimeter</param>
+          <param name="mujoco_sensor_name">local_linvel</param>
+        </xacro:unless>
+        <state_interface name="linear_velocity.x"/>
+        <state_interface name="linear_velocity.y"/>
+        <state_interface name="linear_velocity.z"/>
+      </sensor>
+
+      <!-- Contact sensors - MuJoCo collision detection -->
+      <!-- Reference: Python mujoco_infer_base.py get_feet_contacts() (lines 280-283) -->
+      <!-- Checks collisions between foot bodies and floor using mj_data_->contact[] array -->
+      <!-- Matches Python reference: check_contact(data, "foot_assembly", "floor") -->
+      <sensor name="${prefix}left_foot_contact">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">contact</param>
+          <param name="body1_name">foot_assembly</param>
+          <param name="body2_name">floor</param>
+        </xacro:unless>
+        <state_interface name="contact"/>
+      </sensor>
+
+      <sensor name="${prefix}right_foot_contact">
+        <xacro:unless value="${use_mock_hardware}">
+          <param name="mujoco_type">contact</param>
+          <param name="body1_name">foot_assembly_2</param>
+          <param name="body2_name">floor</param>
+        </xacro:unless>
+        <state_interface name="contact"/>
+      </sensor>
+    </ros2_control>
+
+  </xacro:macro>
+
+</robot>
