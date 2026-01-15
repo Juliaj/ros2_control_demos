@@ -113,7 +113,7 @@ motion_controller:
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py
     # Update rate: 1/(sim_dt * decimation) = 1/(0.002 * 10) = 50 Hz
     # update_rate: 25
-    enable_debug_publishing: true
+    enable_debug_publishing: false
     
     # Joint configuration (14 joints total)
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/constants.py
@@ -210,8 +210,8 @@ motion_controller:
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 110
     imu_sensor_name: "imu"
     # MuJoCo accelerometer reports negative z when standing (ground pushes down in sensor frame)
-    # Set to true to invert z-axis to match expected +9.8 m/s² for standing robot
-    imu_upside_down: true
+    # Set to false to not invert z-axis to match expected +9.8 m/s² for standing robot
+    imu_upside_down: false
 
     # Debug: Force alternating contacts to test if constant contacts are cause of robot not moving
     # If true, overrides real contact sensor values with alternating pattern [1.0,0.0] <-> [0.0,1.0] every 25 steps
