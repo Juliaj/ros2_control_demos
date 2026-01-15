@@ -92,6 +92,11 @@ private:
   std::string interfaces_broadcaster_topic_;
   std::string interfaces_broadcaster_names_topic_;
   std::string velocity_command_topic_;
+  bool use_contact_sensors_{ false };
+  bool log_contact_sensors_{ true };
+  std::string left_contact_sensor_name_{ "left_foot_contact" };
+  std::string right_contact_sensor_name_{ "right_foot_contact" };
+  std::vector<std::string> interface_names_cache_;
 
   // Model runtime (ONNX Runtime)
 #ifdef ONNXRUNTIME_FOUND

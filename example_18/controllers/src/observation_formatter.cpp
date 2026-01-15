@@ -38,9 +38,6 @@ ObservationFormatter::ObservationFormatter(
   imu_upside_down_(false),
   skip_imu_inversion_(false),
   gyro_deadband_(0.0),
-  left_foot_contact_sensor_name_("left_foot_contact"),
-  right_foot_contact_sensor_name_("right_foot_contact"),
-  contact_force_threshold_(5.0),  // 5N threshold for contact detection from FTS
   previous_joint_positions_(num_joints_, 0.0),
   previous_joint_velocities_(num_joints_, 0.0),
   previous_states_initialized_(false),
@@ -48,8 +45,8 @@ ObservationFormatter::ObservationFormatter(
   last_last_action_(num_joints_, 0.0),
   last_last_last_action_(num_joints_, 0.0),
   motor_targets_(num_joints_, 0.0),
-  left_foot_contact_(0.0),
-  right_foot_contact_(0.0),
+  left_contact_(0.0),
+  right_contact_(0.0),
   imitation_i_(0.0),
   phase_period_(100.0),
   imitation_phase_(2, 0.0),
@@ -122,7 +119,8 @@ std::vector<float> ObservationFormatter::format(
     warned_about_zero_accel = true;
   }
   
-  observation.push_back(static_cast<float>(accelero[0] + 1.3));  // Apply x-axis bias
+  // Apply x-axis bias to match MuJoCo training data / reference implementation.
+  observation.push_back(static_cast<float>(accelero[0] + 1.3));
   observation.push_back(static_cast<float>(accelero[1]));
   // Invert z-acceleration if IMU is upside down (MuJoCo reports -9.8 when standing, should be +9.8)
   // Skip inversion if using injected data (data from Python already in correct format)
@@ -184,8 +182,8 @@ std::vector<float> ObservationFormatter::format(
   }
 
   // 10. Feet contacts (2D)
-  double left_contact = left_foot_contact_;
-  double right_contact = right_foot_contact_;
+  double left_contact = left_contact_;
+  double right_contact = right_contact_;
   
   observation.push_back(static_cast<float>(left_contact));
   observation.push_back(static_cast<float>(right_contact));
@@ -463,8 +461,8 @@ void ObservationFormatter::set_motor_targets(const std::vector<double> & motor_t
 
 void ObservationFormatter::set_feet_contacts(double left_contact, double right_contact)
 {
-  left_foot_contact_ = left_contact;
-  right_foot_contact_ = right_contact;
+  left_contact_ = left_contact;
+  right_contact_ = right_contact;
 }
 
 void ObservationFormatter::update_imitation_phase(double phase_frequency_factor)
@@ -509,70 +507,6 @@ void ObservationFormatter::set_velocity_commands(const std::vector<double> & com
       logger, "Velocity commands size mismatch: expected 7, got %zu. Keeping previous commands.",
       commands.size());
   }
-}
-
-bool ObservationFormatter::extract_feet_contacts(
-  const control_msgs::msg::Float64Values & interface_data, double & left_contact,
-  double & right_contact)
-{
-  left_contact = 0.0;
-  right_contact = 0.0;
-
-  if (interface_names_.empty() || interface_data.values.empty())
-  {
-    return false;
-  }
-
-  auto logger = rclcpp::get_logger("observation_formatter");
-  const size_t count = std::min(interface_names_.size(), interface_data.values.size());
-
-  // Try to find contact sensors first (binary contact interfaces)
-  // Pattern: "{sensor_name}/contact" or "{sensor_name}/value"
-  bool left_contact_found = false;
-  bool right_contact_found = false;
-
-  for (size_t i = 0; i < count; ++i)
-  {
-    const std::string & interface_name = interface_names_[i];
-    const double value = interface_data.values[i];
-
-    // Check for left foot contact sensor
-    if (!left_contact_found &&
-        (interface_name.find(left_foot_contact_sensor_name_) != std::string::npos ||
-         interface_name.find("left_foot") != std::string::npos) &&
-        (interface_name.find("/contact") != std::string::npos ||
-         interface_name.find("/value") != std::string::npos))
-    {
-      left_contact = (value > 0.5) ? 1.0 : 0.0;  // Binary threshold
-      left_contact_found = true;
-    }
-
-    // Check for right foot contact sensor
-    if (!right_contact_found &&
-        (interface_name.find(right_foot_contact_sensor_name_) != std::string::npos ||
-         interface_name.find("right_foot") != std::string::npos) &&
-        (interface_name.find("/contact") != std::string::npos ||
-         interface_name.find("/value") != std::string::npos))
-    {
-      right_contact = (value > 0.5) ? 1.0 : 0.0;  // Binary threshold
-      right_contact_found = true;
-    }
-  }
-
-  // If both contact sensors found, return success
-  if (left_contact_found && right_contact_found)
-  {
-    static size_t info_counter = 0;
-    if (++info_counter % 250 == 0)  // Log every 250 calls (~10 seconds at 25Hz)
-    {
-      RCLCPP_INFO(
-        logger, "Using contact sensors: left=%.0f, right=%.0f", left_contact, right_contact);
-    }
-    return true;
-  }
-
-  // No contact sensors found
-  return false;
 }
 
 }  // namespace motion_controller

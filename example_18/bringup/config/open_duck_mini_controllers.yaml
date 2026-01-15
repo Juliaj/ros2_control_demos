@@ -16,11 +16,12 @@
 
 controller_manager:
   ros__parameters:
-    # Source: Reduced from 100 Hz to 25 Hz to lower CPU usage for MuJoCo simulation
+    # Controller update rate.
+    # For sim2sim parity with training (sim_dt=0.002, decimation=10), use 50 Hz (0.02s period).
     # Note: PID gains configuration available in open_duck_mini_pids.yaml
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/xmls/open_duck_mini_v2.xml
     # To enable PID control, add pids_config_file parameter to ros2_control xacro
-    update_rate: 25
+    update_rate: 50
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -100,11 +101,11 @@ state_interfaces_broadcaster:
       - right_hip_pitch/velocity    # 35
       - right_knee/velocity         # 36
       - right_ankle/velocity        # 37
-      # Contact sensor interfaces (indices 38-39)
-      # Source: ros2_control xacro open_duck_mini.ros2_control.xacro sensor names
-      # Required for gait control - binary values (0.0 = no contact, 1.0 = contact)
-      - left_foot_contact/contact   # 38
-      - right_foot_contact/contact  # 39
+      # Foot contact sensor interfaces (binary 0/1)
+      - left_foot_contact/contact_raw   # 38
+      - left_foot_contact/contact       # 39
+      - right_foot_contact/contact_raw  # 40
+      - right_foot_contact/contact      # 41
 
 
 motion_controller:
@@ -148,8 +149,15 @@ motion_controller:
     # ROS2 topic configuration
     # Source: Standard ROS2 topic naming conventions
     interfaces_broadcaster_topic: "state_interfaces_broadcaster/values"
+    interfaces_broadcaster_names_topic: "state_interfaces_broadcaster/names"
     velocity_command_topic: "~/cmd_head_velocity"
     feet_contact_topic: "~/feet_contacts"
+    # Contact sensor consumption/logging (from mujoco_ros2_control contact sensors).
+    # if false, we use artificial contacts (phase-based contacts), but logs sensor values for comparison.
+    use_contact_sensors: true
+    log_contact_sensors: true
+    left_contact_sensor_name: "left_foot_contact"
+    right_contact_sensor_name: "right_foot_contact"
 
     # Action processing parameters
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 31

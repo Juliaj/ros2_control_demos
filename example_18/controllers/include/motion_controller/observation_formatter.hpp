@@ -60,16 +60,6 @@ public:
   std::vector<double> extract_joint_velocities(
     const control_msgs::msg::Float64Values & interface_data);
 
-  // Extract feet contact data from interface data (uses real sensors if available)
-  // Returns [left_contact, right_contact] as binary values (1.0 = contact, 0.0 = no contact)
-  // Checks for:
-  //   1. Contact sensors (e.g., "left_foot_contact/contact", "right_foot_contact/contact")
-  //   2. Force/torque sensors (FTS) - uses force magnitude threshold
-  //   3. Returns false if no sensors found (caller should use phase-based estimation)
-  bool extract_feet_contacts(
-    const control_msgs::msg::Float64Values & interface_data, double & left_contact,
-    double & right_contact);
-
   // Set default joint positions for relative position calculation
   void set_default_joint_positions(const std::vector<double> & default_positions);
 
@@ -172,11 +162,6 @@ private:
   // Gyro deadband threshold (rad/s) - values below this are set to zero
   double gyro_deadband_;
 
-  // Contact sensor names (configurable, defaults to common patterns)
-  std::string left_foot_contact_sensor_name_;
-  std::string right_foot_contact_sensor_name_;
-  double contact_force_threshold_;  // Force threshold for FTS-based contact detection (N)
-
   // Names associated with incoming Float64Values message
   std::vector<std::string> interface_names_;
 
@@ -194,8 +179,8 @@ private:
   std::vector<double> motor_targets_;
 
   // Feet contacts
-  double left_foot_contact_;
-  double right_foot_contact_;
+  double left_contact_;
+  double right_contact_;
 
   // Imitation phase state
   double imitation_i_;                   // phase counter

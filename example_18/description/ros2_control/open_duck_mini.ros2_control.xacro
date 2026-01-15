@@ -201,19 +201,6 @@
         <state_interface name="linear_acceleration.z"/>
       </sensor>
 
-      <!-- Velocimeter sensor - base linear velocity in local frame -->
-      <!-- MuJoCo sensor: velocimeter (local_linvel) -->
-      <!-- Provides 3D linear velocity of the base in the local frame -->
-      <sensor name="${prefix}velocimeter">
-        <xacro:unless value="${use_mock_hardware}">
-          <param name="mujoco_type">velocimeter</param>
-          <param name="mujoco_sensor_name">local_linvel</param>
-        </xacro:unless>
-        <state_interface name="linear_velocity.x"/>
-        <state_interface name="linear_velocity.y"/>
-        <state_interface name="linear_velocity.z"/>
-      </sensor>
-
       <!-- Contact sensors - MuJoCo collision detection -->
       <!-- Reference: Python mujoco_infer_base.py get_feet_contacts() (lines 280-283) -->
       <!-- Checks collisions between foot bodies and floor using mj_data_->contact[] array -->
@@ -223,7 +210,11 @@
           <param name="mujoco_type">contact</param>
           <param name="body1_name">foot_assembly</param>
           <param name="body2_name">floor</param>
+          <param name="contact_consumer">gait</param>
+          <param name="debounce_on_steps">3</param>
+          <param name="debounce_off_steps">3</param>
         </xacro:unless>
+        <state_interface name="contact_raw"/>
         <state_interface name="contact"/>
       </sensor>
 
@@ -232,7 +223,11 @@
           <param name="mujoco_type">contact</param>
           <param name="body1_name">foot_assembly_2</param>
           <param name="body2_name">floor</param>
+          <param name="contact_consumer">gait</param>
+          <param name="debounce_on_steps">3</param>
+          <param name="debounce_off_steps">3</param>
         </xacro:unless>
+        <state_interface name="contact_raw"/>
         <state_interface name="contact"/>
       </sensor>
     </ros2_control>
