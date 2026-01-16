@@ -56,7 +56,7 @@ class DriveForward(Node):
         self.blend_in_time = self.blend_in_steps / self.controller_update_rate  # ~4.0s
         self.controller_warmup_time = self.stabilization_delay_time + self.blend_in_time  # ~5.0s
 
-    def drive_forward(self, duration=2.0, lin_vel_x=0.15, lin_vel_y=0.0, ang_vel_z=0.0, 
+    def drive_forward(self, duration=2.0, lin_vel_x=0.15, lin_vel_y=0.0, ang_vel_z=0.0,
                      stabilize_time=None, wait_for_warmup=True, ramp_up_duration=3.0, 
                      ramp_up_increment=0.01):
         # Wait for publisher to discover subscribers
@@ -111,46 +111,59 @@ class DriveForward(Node):
         # [lin_vel_x, lin_vel_y, ang_vel, neck_pitch, head_pitch, head_yaw, head_roll]
         if duration > 0:
             # Ramp-up phase: gradually increase velocity to target (matching manual_control_ros2.py behavior)
-            # This prevents oscillation when applying full velocity immediately
-            if ramp_up_duration > 0 and abs(lin_vel_x) > 0.001:
+            # This prevents oscillation when applying full velocity immediately.
+            #
+            # If both x and y are requested, ramp the dominant axis (larger magnitude).
+            dominant_is_x = abs(lin_vel_x) >= abs(lin_vel_y)
+            target_vel = float(lin_vel_x) if dominant_is_x else float(lin_vel_y)
+            target_axis = "x" if dominant_is_x else "y"
+            should_ramp = ramp_up_duration > 0 and abs(target_vel) > 0.001
+
+            if should_ramp:
                 self.get_logger().info(
-                    f'Ramping up velocity from {ramp_up_increment:.3f} to {lin_vel_x:.3f} m/s '
-                    f'over {ramp_up_duration:.1f} seconds'
+                    f'Ramping up velocity from {ramp_up_increment:.3f} to {target_vel:.3f} m/s '
+                    f'over {ramp_up_duration:.1f} seconds (axis: {target_axis})'
                 )
-                
+
                 # Calculate number of steps and velocity increment per step
                 ramp_steps = int(ramp_up_duration * publish_rate)
-                start_vel = ramp_up_increment if lin_vel_x > 0 else -ramp_up_increment
-                target_vel = lin_vel_x
+                start_vel = ramp_up_increment if target_vel > 0 else -ramp_up_increment
                 vel_range = abs(target_vel - start_vel)
-                
+
                 if ramp_steps > 0:
                     vel_increment_per_step = vel_range / ramp_steps
                     current_vel = start_vel
-                    
+
                     ramp_msg = VelocityCommandWithHead()
-                    ramp_msg.base_velocity.linear.y = float(lin_vel_y)
+                    ramp_msg.base_velocity.linear.x = float(0.0 if not dominant_is_x else start_vel)
+                    ramp_msg.base_velocity.linear.y = float(start_vel if not dominant_is_x else 0.0)
                     ramp_msg.base_velocity.angular.z = float(ang_vel_z)
                     ramp_msg.head_commands = [0.0, 0.0, 0.0, 0.0]
-                    
+
                     for step in range(ramp_steps):
-                        if lin_vel_x > 0:
+                        if target_vel > 0:
                             current_vel = min(start_vel + step * vel_increment_per_step, target_vel)
                         else:
                             current_vel = max(start_vel - step * vel_increment_per_step, target_vel)
-                        
-                        ramp_msg.base_velocity.linear.x = float(current_vel)
+
+                        if dominant_is_x:
+                            ramp_msg.base_velocity.linear.x = float(current_vel)
+                            ramp_msg.base_velocity.linear.y = float(lin_vel_y)
+                        else:
+                            ramp_msg.base_velocity.linear.x = float(lin_vel_x)
+                            ramp_msg.base_velocity.linear.y = float(current_vel)
+
                         self.publisher_.publish(ramp_msg)
-                        
+
                         if step % 25 == 0:  # Log every 0.5 seconds
                             self.get_logger().info(
-                                f'Ramp-up: vel_x={current_vel:.3f} m/s (target: {target_vel:.3f})'
+                                f'Ramp-up: vel_{target_axis}={current_vel:.3f} m/s (target: {target_vel:.3f})'
                             )
-                        
+
                         time.sleep(sleep_time)
-                    
+
                     self.get_logger().info(
-                        f'Ramp-up complete: reached target velocity {target_vel:.3f} m/s'
+                        f'Ramp-up complete: reached target velocity {target_vel:.3f} m/s (axis: {target_axis})'
                     )
             
             # Constant velocity phase: maintain target velocity
@@ -213,11 +226,11 @@ def main(args=None):
     )
     node.drive_forward(duration=0.0, stabilize_time=node.controller_warmup_time, wait_for_warmup=True)
     
-    # Test 2: Forward walk - matching manual_control_ros2.py default velocity
-    # Reference: manual_control_ros2.py uses 0.15 m/s as default forward velocity
+    # Test 2: Axis-swap test (diagnostic)
+    # If the controller/policy frame is mismatched, commanding +Y may produce "forward" motion in the sim.
     # Note: Controller is now fully warmed up, so motion should start immediately
-    node.get_logger().info('Test 2: Forward walk (20s at 0.15 m/s - matching manual_control default)')
-    node.drive_forward(duration=20.0, lin_vel_x=0.15, stabilize_time=0.0, wait_for_warmup=False)
+    node.get_logger().info('Test 2: Axis-swap walk (20s at lin_vel_y=0.15 m/s, lin_vel_x=0.0)')
+    node.drive_forward(duration=20.0, lin_vel_x=0.15, lin_vel_y=0.0, stabilize_time=0.0, wait_for_warmup=False)
     
     # # Test 3: Backward walk - reverse of forward
     # node.get_logger().info('Test 3: Backward walk (4s at -0.15 m/s)')
