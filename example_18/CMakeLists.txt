@@ -142,20 +142,6 @@ install(
   DIRECTORY bringup/
   DESTINATION share/ros2_control_demo_example_18
 )
-# Install fine_tuning directory (excluding launch file to avoid duplicate)
-install(
-  DIRECTORY fine_tuning/
-  DESTINATION share/ros2_control_demo_example_18/fine_tuning
-  FILES_MATCHING
-  PATTERN "*.py"
-  PATTERN "data_collection.launch.py" EXCLUDE
-  PATTERN "*.md"
-)
-# Install launch file to launch/ directory for ros2 launch to find it
-install(
-  FILES fine_tuning/data_collection.launch.py
-  DESTINATION share/ros2_control_demo_example_18/launch
-)
 install(
   DIRECTORY description/
   DESTINATION share/ros2_control_demo_example_18/description
@@ -173,9 +159,6 @@ install(TARGETS
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
 )
-
-# Export Gazebo resource paths so meshes are discoverable at runtime.
-ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/gz_sim_resource_path.dsv.in")
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
@@ -244,7 +227,7 @@ if(BUILD_TESTING)
     endif()
   else()
     include(FetchContent)
-    
+
     # Detect architecture
     set(MUJOCO_VERSION "3.4.0")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
@@ -252,24 +235,24 @@ if(BUILD_TESTING)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
       set(CPU_ARCH "aarch64")
     endif()
-    
+
     if(CPU_ARCH)
       message(STATUS "No MuJoCo installation found. Downloading MuJoCo ${MUJOCO_VERSION} for ${CPU_ARCH}.")
-      
+
       set(MUJOCO_DOWNLOAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/mujoco)
       set(MUJOCO_EXTRACT_DIR ${MUJOCO_DOWNLOAD_DIR}/mujoco-${MUJOCO_VERSION})
       set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
-      FetchContent_Declare(
+      fetchcontent_declare(
         mujoco_download
         URL https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-${CPU_ARCH}.tar.gz
         SOURCE_DIR ${MUJOCO_EXTRACT_DIR}
         DOWNLOAD_EXTRACT_TIMESTAMP True
       )
-      FetchContent_MakeAvailable(mujoco_download)
-      
+      fetchcontent_makeavailable(mujoco_download)
+
       set(MUJOCO_DIR ${MUJOCO_EXTRACT_DIR})
       message(STATUS "MuJoCo downloaded to: ${MUJOCO_DIR}")
-      
+
       find_library(MUJOCO_LIB mujoco HINTS ${MUJOCO_DIR}/lib NO_DEFAULT_PATH)
       if(MUJOCO_LIB)
         set(MUJOCO_INCLUDE_DIR ${MUJOCO_DIR}/include)
@@ -285,7 +268,7 @@ if(BUILD_TESTING)
     target_include_directories(test_motion_controller_mujoco PRIVATE
       ${PROJECT_SOURCE_DIR}/controllers/include
     )
-    
+
     # Use imported target if available, otherwise use manual variables
     if(TARGET mujoco::mujoco)
       target_link_libraries(test_motion_controller_mujoco
@@ -299,7 +282,7 @@ if(BUILD_TESTING)
         ${MUJOCO_LIB}
       )
     endif()
-    
+
     add_custom_target(build_example_18_tests ALL
       DEPENDS
         test_observation_formatter

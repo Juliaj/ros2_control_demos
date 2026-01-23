@@ -33,19 +33,15 @@ public:
   // Process model outputs: apply scaling and default offset
   // Model outputs are relative joint positions (scaled by action_scale)
   // Returns absolute joint positions ready for hardware command interfaces
-  // Reference: Open Duck Mini v2_rl_walk_mujoco.py lines 290, 310-311
+  // Reference: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
+  //   motor_targets = default_actuator + action * action_scale
   std::vector<double> process(
     const std::vector<double> & model_outputs, const std::vector<double> & default_joint_positions);
 
-  // Process model outputs with head commands
-  // Head commands (4D) are added to head joint targets
-  // Reference: Open Duck Mini v2_rl_walk_mujoco.py line 310-311
-  std::vector<double> process_with_head_commands(
-    const std::vector<double> & model_outputs, const std::vector<double> & default_joint_positions,
-    const std::vector<double> & head_commands);
-
   // Set head joint indices (which joints are controlled by head commands)
-  // Default: indices 5-9 (4 joints) for Open Duck Mini
+  // Default: indices 5-8 (4 joints) for Open Duck Mini
+  // NOTE: Currently unused - head commands are passed to observation formatter but not applied
+  // to motor targets (matching mujoco_infer.py behavior where head override is commented out)
   void set_head_joint_indices(const std::vector<size_t> & head_joint_indices);
 
   double get_action_scale() const { return action_scale_; }
@@ -54,7 +50,7 @@ public:
 private:
   std::vector<std::string> joint_names_;
   size_t num_joints_;
-  double action_scale_;      // Scale factor for model outputs (default: 0.25 from env_cfg.py)
+  double action_scale_;      // Scale factor for model outputs (default: 0.25, see mujoco_infer.py)
   bool use_default_offset_;  // Whether to add default joint positions (default: true)
   std::vector<size_t>
     head_joint_indices_;  // Indices of head joints (default: 5-9 for 4 head joints)

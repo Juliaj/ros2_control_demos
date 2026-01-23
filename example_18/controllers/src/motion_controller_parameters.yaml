@@ -25,8 +25,8 @@ motion_controller:
   }
   velocity_command_topic: {
     type: string,
-    default_value: "~/cmd_head_velocity",
-    description: "Topic name for velocity commands (example_18_motion_controller_msgs/VelocityCommandWithHead). Contains base_velocity (geometry_msgs/Twist) and head_commands (float64[4] for neck_pitch, head_pitch, head_yaw, head_roll in radians)"
+    default_value: "~/cmd_velocity_with_head",
+    description: "Topic name for velocity commands (custom message: example_18_motion_controller_msgs/VelocityCommandWithHead). Contains base_velocity (geometry_msgs/Twist) and head_commands (float64[4] for neck_pitch, head_pitch, head_yaw, head_roll in radians). This extends standard cmd_vel with additional head joint position commands."
   }
   feet_contact_topic: {
     type: string,
@@ -35,72 +35,67 @@ motion_controller:
   }
 
   # Action processing parameters
-  # Source: v2_rl_walk_mujoco.py:32
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
   action_scale: {
     type: double,
-    default_value: 0.3,
-    description: "Scale factor for model outputs. Source: v2_rl_walk_mujoco.py line 32"
+    default_value: 0.25,
+    description: "Scale factor for model outputs. Source: mujoco_infer.py line 31 (action_scale = 0.25), line 213 (motor_targets = default_actuator + action * self.action_scale). NOTE: manual_control_ros2.py uses 0.3, but C++ defaults to 0.25 to match mujoco_infer.py"
   }
-  # Source: v2_rl_walk_mujoco.py:88-91, 161
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml and mujoco_infer_base.py
   default_joint_positions: {
     type: double_array,
     default_value: [],
-    description: "Default joint positions (init_pos) for relative position calculation. If empty, initialized from sensor data. Source: v2_rl_walk_mujoco.py lines 88-91, 161"
+    description: "Default joint positions (init_pos) for relative position calculation. If empty, initialized from sensor data. Source: scene_flat_terrain.xml keyframe(\"home\").ctrl (lines 59-74), mujoco_infer_base.py lines 121-123 (default_actuator = model.keyframe(\"home\").ctrl)"
   }
-  # Source: v2_rl_walk_mujoco.py:310-311
-  head_joint_indices: {
-    type: int_array,
-    default_value: [5, 6, 7, 8],
-    description: "Indices of head joints receiving additional head commands. Source: v2_rl_walk_mujoco.py lines 310-311 (motor_targets[5:9])"
-  }
-
   # IMU sensor configuration
+  # Source: ros2_control xacro open_duck_mini.ros2_control.xacro sensor name "imu"
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 110
   imu_sensor_name: {
     type: string,
-    default_value: "imu_2",
-    description: "Name of the IMU sensor for gyro and accelerometer data"
+    default_value: "imu",
+    description: "Name of the IMU sensor for gyro and accelerometer data. Matches ros2_control xacro sensor name and MuJoCo site name in open_duck_mini_v2.xml"
   }
-  # Source: example_config.json:3
+  # Source: MuJoCo accelerometer behavior
   imu_upside_down: {
     type: bool,
     default_value: false,
-    description: "Whether the IMU sensor is mounted upside down. Source: example_config.json line 3"
+    description: "Whether to invert IMU z-acceleration. MuJoCo accelerometer reports negative z when standing (ground pushes down in sensor frame). Set to false to not invert z-axis to match expected +9.8 m/s² for standing robot"
   }
 
-  # Control state parameters
-  # Source: example_config.json:2, v2_rl_walk_mujoco.py:95-96, 242-247
+  # Control state parameters (debugging/unused: not implemented in controller)
   start_paused: {
     type: bool,
     default_value: false,
-    description: "Start controller in paused state (robot will not move until unpaused). Source: example_config.json line 2, v2_rl_walk_mujoco.py lines 95-96, 242-247"
+    description: "Start controller in paused state (robot will not move until unpaused). NOTE: Not currently used - pause functionality is not implemented in C++ controller."
   }
 
   # Gait phase parameters
-  # Source: example_config.json:4, v2_rl_walk_mujoco.py:107-108, 214-223, 257-258
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
   phase_frequency_factor_offset: {
     type: double,
     default_value: 0.0,
-    description: "Offset to gait phase frequency factor (affects walking speed). Source: example_config.json line 4, v2_rl_walk_mujoco.py lines 107-108, 214-223, 257-258"
+    description: "Offset to gait phase frequency factor (affects walking speed). Added to base factor 1.0. Source: mujoco_infer.py line 60 (phase_frequency_factor = 1.0), line 176 (imitation_i += 1.0 * self.phase_frequency_factor)"
   }
-  # Source: v2_rl_walk_mujoco.py:103, 260
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
   phase_period: {
     type: double,
     default_value: 50.0,
-    description: "Number of steps in one gait cycle period (PRM.nb_steps_in_period). Source: v2_rl_walk_mujoco.py lines 103, 260"
+    description: "Number of steps in one gait cycle period (PRM.nb_steps_in_period). Source: mujoco_infer.py line 178 (imitation_i % self.PRM.nb_steps_in_period)"
   }
 
-  # Action filtering
-  # Source: v2_rl_walk_mujoco.py:37, 64-67, 300-306
+  # Action filtering (debugging/unused: action filter is not implemented in C++ controller)
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 33 (action_filter created but commented out at lines 205-206)
   cutoff_frequency: {
     type: double,
-    default_value: 0.0,
-    description: "Cutoff frequency for low-pass action filter (Hz). 0.0 = no filtering. Source: v2_rl_walk_mujoco.py lines 37, 64-67, 300-306"
+    default_value: 37.5,
+    description: "Cutoff frequency for low-pass action filter (Hz). 0.0 = no filtering. NOTE: Not currently used - action filter is not implemented in C++ controller. Source: mujoco_infer.py line 33 (LowPassActionFilter with cutoff_frequency=37.5, but filter is commented out at lines 205-206)"
   }
   # Motor velocity limit
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
   max_motor_velocity: {
     type: double,
-    default_value: 8.0,
-    description: "Maximum motor velocity in rad/s. Prevents exceeding physical motor capability."
+    default_value: 5.24,
+    description: "Maximum motor velocity in rad/s. Prevents exceeding physical motor capability. Source: mujoco_infer.py line 58 (max_motor_velocity = 5.24). NOTE: manual_control_ros2.py uses 8.0, but C++ defaults to 5.24 to match mujoco_infer.py"
   }
   # Gyro deadband filtering
   gyro_deadband: {

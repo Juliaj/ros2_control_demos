@@ -104,7 +104,7 @@ def find_body_by_name(root, body_name):
 def extract_visual_geoms(body_elem):
     """
     Extract visual geometry elements from a body.
-    
+
     Assumptions:
     1. Visual geoms are identified by class="visual" or type="mesh" with contype="0"
     2. Geom positions (pos) are relative to the body frame (not absolute)
@@ -124,18 +124,20 @@ def extract_visual_geoms(body_elem):
                 # This will be used as visual origin relative to link frame in URDF
                 pos = parse_vec3(geom.get("pos"))
                 quat = parse_quat(geom.get("quat"))
-                visuals.append({
-                    "mesh": mesh_name,
-                    "pos": pos,
-                    "quat": quat,
-                })
+                visuals.append(
+                    {
+                        "mesh": mesh_name,
+                        "pos": pos,
+                        "quat": quat,
+                    }
+                )
     return visuals
 
 
 def extract_joint_info(body_elem):
     """
     Extract joint information from a body element.
-    
+
     Assumptions:
     1. Each body has at most one joint (MuJoCo convention)
     2. Joint is a direct child element of the body
@@ -151,7 +153,7 @@ def extract_joint_info(body_elem):
     if not joint_name:
         # Joint without name is invalid - return None
         return None
-    
+
     joint_type = joint.get("type", "hinge")
     joint_range = joint.get("range", "")
     # Default axis is Z-axis (0 0 1) - common for revolute joints
@@ -192,7 +194,7 @@ def extract_inertial(body_elem):
     if inertia_str:
         parts = inertia_str.split()
         if len(parts) >= 6:
-            ixx, iyy, izz, ixy, ixz, iyz = [float(p) for p in parts[:6]]
+            ixx, iyy, izz, ixy, ixz, iyz = (float(p) for p in parts[:6])
 
     return {
         "mass": mass,
@@ -204,7 +206,7 @@ def extract_inertial(body_elem):
 def get_link_name_from_joint(joint_name):
     """
     Map joint name to URDF link name.
-    
+
     Assumptions:
     1. Joint names follow a consistent naming pattern
     2. Link names are derived by appending "_link" to joint names
@@ -240,7 +242,7 @@ def get_link_name_from_joint(joint_name):
 def build_body_hierarchy(root, parent_body=None, parent_link_name="base"):
     """
     Recursively build body hierarchy and extract link/joint information.
-    
+
     Assumptions:
     1. MuJoCo body structure: Each body with a joint represents a URDF link
     2. Body position (pos) in MuJoCo is relative to parent body frame
@@ -282,7 +284,12 @@ def build_body_hierarchy(root, parent_body=None, parent_link_name="base"):
             # For bodies without explicit joints, derive link name from body name
             # Note: This handles cases like "hip_roll_assembly_2" -> "hip_roll_link"
             # but should not be used if joint_info exists (which maps to correct link name)
-            link_name = body_name.replace("_assembly", "_link").replace("_2", "").replace("_3", "").replace("_4", "")
+            link_name = (
+                body_name.replace("_assembly", "_link")
+                .replace("_2", "")
+                .replace("_3", "")
+                .replace("_4", "")
+            )
 
     # Extract body properties
     # Assumption: Body position (pos) in MuJoCo is the transform from parent body frame
@@ -339,53 +346,53 @@ def generate_urdf_link(link_data, meshdir, package_name, mesh_map):
 
             # Look up mesh filename from mapping, fallback to mesh_name.stl
             mesh_file = mesh_map.get(mesh_name, f"{mesh_name}.stl")
-            
+
             # Always use package:// URI - ROS2 will resolve it dynamically using ament_index
             # This works regardless of install mode (symlink or copy) and is the standard ROS2 approach
             mesh_uri = f"package://{package_name}/description/assets/{mesh_file}"
 
-            link_xml += '    <visual>\n'
-            link_xml += '      <geometry>\n'
+            link_xml += "    <visual>\n"
+            link_xml += "      <geometry>\n"
             link_xml += f'        <mesh filename="{mesh_uri}"/>\n'
-            link_xml += '      </geometry>\n'
+            link_xml += "      </geometry>\n"
             link_xml += f'      <origin xyz="{pos[0]:.6f} {pos[1]:.6f} {pos[2]:.6f}" '
             link_xml += f'rpy="{rpy[0]:.6f} {rpy[1]:.6f} {rpy[2]:.6f}"/>\n'
-            link_xml += '    </visual>\n'
+            link_xml += "    </visual>\n"
     else:
         # Fallback to simple box if no visuals
-        link_xml += '    <visual>\n'
-        link_xml += '      <geometry>\n'
+        link_xml += "    <visual>\n"
+        link_xml += "      <geometry>\n"
         link_xml += '        <box size="0.05 0.05 0.05"/>\n'
-        link_xml += '      </geometry>\n'
-        link_xml += '    </visual>\n'
+        link_xml += "      </geometry>\n"
+        link_xml += "    </visual>\n"
 
     # Add inertial
     if inertial:
         mass = inertial["mass"]
         pos = inertial["pos"]
         ixx, iyy, izz, ixy, ixz, iyz = inertial["inertia"]
-        link_xml += '    <inertial>\n'
+        link_xml += "    <inertial>\n"
         link_xml += f'      <mass value="{mass:.6f}"/>\n'
         link_xml += f'      <origin xyz="{pos[0]:.6f} {pos[1]:.6f} {pos[2]:.6f}"/>\n'
         link_xml += f'      <inertia ixx="{ixx:.6f}" ixy="{ixy:.6f}" ixz="{ixz:.6f}" '
         link_xml += f'iyy="{iyy:.6f}" iyz="{iyz:.6f}" izz="{izz:.6f}"/>\n'
-        link_xml += '    </inertial>\n'
+        link_xml += "    </inertial>\n"
     else:
         # Minimal inertial
-        link_xml += '    <inertial>\n'
+        link_xml += "    <inertial>\n"
         link_xml += '      <mass value="0.01"/>\n'
         link_xml += '      <inertia ixx="0.0001" ixy="0.0" ixz="0.0" '
         link_xml += 'iyy="0.0001" iyz="0.0" izz="0.0001"/>\n'
-        link_xml += '    </inertial>\n'
+        link_xml += "    </inertial>\n"
 
-    link_xml += '  </link>\n'
+    link_xml += "  </link>\n"
     return link_xml
 
 
 def generate_urdf_joint(joint_data, link_data):
     """
     Generate URDF joint XML from joint data.
-    
+
     Assumptions:
     1. Joint origin uses the body's position and orientation from MuJoCo
     2. Body position (pos) in MuJoCo represents the transform from parent to child frame
@@ -401,7 +408,7 @@ def generate_urdf_joint(joint_data, link_data):
     joint_type = joint["type"]
     parent = link_data["parent"]
     child = link_data["link_name"]
-    
+
     # Use body position and orientation as joint origin
     # Assumption: In MuJoCo, body pos/quat define the frame transform from parent to child
     # This is exactly what URDF joint origin needs (transform from parent link to child link)
@@ -424,14 +431,14 @@ def generate_urdf_joint(joint_data, link_data):
         joint_xml += f'    <limit lower="{range_min:.17f}" upper="{range_max:.17f}" '
         joint_xml += 'effort="3.23" velocity="10.0"/>\n'
 
-    joint_xml += '  </joint>\n'
+    joint_xml += "  </joint>\n"
     return joint_xml
 
 
 def generate_urdf(hierarchy, meshdir, package_name, mesh_map):
     """
     Generate complete URDF XML from hierarchy.
-    
+
     Assumptions:
     1. Hierarchy is a flat list of top-level bodies (starting from trunk_assembly)
     2. Each body contains its children in the "children" field
@@ -439,7 +446,7 @@ def generate_urdf(hierarchy, meshdir, package_name, mesh_map):
     4. The trunk_assembly is the root body and gets a fixed joint to base link
     """
     urdf = '<?xml version="1.0"?>\n'
-    urdf += '<!-- URDF generated from MuJoCo XML with visual mesh geometry -->\n'
+    urdf += "<!-- URDF generated from MuJoCo XML with visual mesh geometry -->\n"
     urdf += '<robot name="open-duck-mini">\n'
     urdf += '  <link name="base"/>\n\n'
 
@@ -449,13 +456,13 @@ def generate_urdf(hierarchy, meshdir, package_name, mesh_map):
     def process_body(body_data):
         # Generate link first (child link must exist before joint references it)
         urdf_part = generate_urdf_link(body_data, meshdir, package_name, mesh_map)
-        urdf_part += '\n'
+        urdf_part += "\n"
 
         # Generate joint (if not root body)
         # Assumption: Bodies without joints are fixed (like trunk_assembly)
         if body_data["joint"] is not None:
             urdf_part += generate_urdf_joint(body_data, body_data)
-            urdf_part += '\n'
+            urdf_part += "\n"
 
         # Process children recursively
         # This ensures all kinematic chains are processed (e.g., left leg, right leg, head)
@@ -479,7 +486,7 @@ def generate_urdf(hierarchy, meshdir, package_name, mesh_map):
         urdf += '    <parent link="base"/>\n'
         urdf += '    <child link="trunk_assembly"/>\n'
         urdf += '    <origin xyz="0 0 0.22" rpy="0 0 0"/>\n'
-        urdf += '  </joint>\n\n'
+        urdf += "  </joint>\n\n"
 
         # Process all bodies starting from trunk_assembly
         # This will recursively process all children (left leg, right leg, head, etc.)
@@ -491,7 +498,7 @@ def generate_urdf(hierarchy, meshdir, package_name, mesh_map):
         for body in hierarchy:
             urdf += process_body(body)
 
-    urdf += '</robot>\n'
+    urdf += "</robot>\n"
     return urdf
 
 
@@ -505,12 +512,14 @@ def main():
         help="Input MuJoCo XML file path",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=str,
         help="Output URDF file path (default: input filename with .urdf extension)",
     )
     parser.add_argument(
-        "-p", "--package",
+        "-p",
+        "--package",
         type=str,
         default="ros2_control_demo_example_18",
         help="ROS package name for mesh URIs (default: ros2_control_demo_example_18)",
@@ -532,7 +541,7 @@ def main():
     # This recursively processes all bodies starting from trunk_assembly
     # Assumption: All kinematic bodies are children of trunk_assembly
     hierarchy = build_body_hierarchy(root)
-    
+
     if not hierarchy:
         print("Error: No bodies found in hierarchy. Check if trunk_assembly exists in XML.")
         return
@@ -543,7 +552,7 @@ def main():
         for body in bodies:
             count += count_bodies(body.get("children", []))
         return count
-    
+
     total_bodies = count_bodies(hierarchy)
     print(f"Found {len(hierarchy)} top-level bodies, {total_bodies} total bodies in hierarchy")
 
@@ -567,7 +576,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-# DONOT MODIFY or DELETE
+# DO NOT MODIFY or DELETE
 # Usage
 # cd ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/description
 # python3 scripts/mujoco_xml_to_urdf.py mujoco/open_duck_mini_v2.xml -o mujoco/robot.urdf -p ros2_control_demo_example_18

@@ -35,8 +35,8 @@ controller_manager:
 joint_state_broadcaster:
   ros__parameters:
     # Source: Configuration for publishing joint states
-    # Publish only movement-related (leg) joints, excluding head joints
-    # 10 leg joints: 5 left leg + 5 right leg
+    # Publish all controllable joints (legs + head)
+    # 14 joints: left leg (5) + head (4) + right leg (5)
     # Joint names match ros2_control xacro: open_duck_mini.ros2_control.xacro
     joints:
       - left_hip_yaw
@@ -44,6 +44,10 @@ joint_state_broadcaster:
       - left_hip_pitch
       - left_knee
       - left_ankle
+      - neck_pitch
+      - head_pitch
+      - head_yaw
+      - head_roll
       - right_hip_yaw
       - right_hip_roll
       - right_hip_pitch
@@ -68,9 +72,7 @@ state_interfaces_broadcaster:
       - imu/linear_acceleration.y  # 8 (accelerometer)
       - imu/linear_acceleration.z  # 9 (accelerometer)
       # Joint position interfaces (indices 10 to 10+N-1)
-      # Source: Open_Duck_Playground/playground/open_duck_mini_v2/constants.py JOINTS_ORDER_NO_HEAD
       # Order: left leg (5), head (4), right leg (5) = 14 joints total
-      # Matches ros2_control xacro joint order: open_duck_mini.ros2_control.xacro
       - left_hip_yaw/position       # 10
       - left_hip_roll/position      # 11
       - left_hip_pitch/position     # 12
@@ -112,14 +114,10 @@ motion_controller:
   ros__parameters:
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py
     # Update rate: 1/(sim_dt * decimation) = 1/(0.002 * 10) = 50 Hz
-    # update_rate: 25
+
+    # Publish debug topics for observation, action, and motor targets
     enable_debug_publishing: true
-    
-    # Joint configuration (14 joints total)
-    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/constants.py
-    # Order: left leg (5), head (4), right leg (5)
-    # Matches ros2_control xacro: open_duck_mini.ros2_control.xacro
-    # Note: constants.py JOINTS_ORDER_NO_HEAD defines leg joints only (10 joints)
+
     joints:
       - left_hip_yaw       # 0
       - left_hip_roll      # 1
@@ -137,21 +135,23 @@ motion_controller:
       - right_ankle        # 13
 
     # Model configuration
-    # duck doesn't walk forward, just shuffles its legs
-    # model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/open_duck_mini_v2.onnx"
     model_path: "$(find-pkg-share ros2_control_demo_example_18)/onnx_model/2025_12_26_165635_300482560.onnx"
 
-    # Model input/output dimensions for validation
-    # Source: open_duck_mini_v2.onnx.metadata.json (obs_size, act_size)
+    # Model input/output dimensions
+    # Source: 2025_12_26_165635_300482560.onnx.metadata.json (obs_size, act_size)
     model_input_size: 101   # Observation dimension
     model_output_size: 14   # Action dimension (number of joints)
-    
-    # ROS2 topic configuration
-    # Source: Standard ROS2 topic naming conventions
+
+    # Topics for observation formatting
     interfaces_broadcaster_topic: "state_interfaces_broadcaster/values"
     interfaces_broadcaster_names_topic: "state_interfaces_broadcaster/names"
-    velocity_command_topic: "~/cmd_head_velocity"
+
+    # Velocity command topic (custom message type: VelocityCommandWithHead)
+    velocity_command_topic: "~/cmd_velocity_with_head"
+
+    # Contact sensor topic for feet contacts
     feet_contact_topic: "~/feet_contacts"
+
     # Contact sensor consumption/logging (from mujoco_ros2_control contact sensors).
     # if false, we use artificial contacts (phase-based contacts), but logs sensor values for comparison.
     use_contact_sensors: true
@@ -162,15 +162,12 @@ motion_controller:
     # Action processing parameters
     # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 31
     # Scales RL policy output actions before applying to joints
-    # action_scale: 0.25
     action_scale: 0.25
-
-    # Source: Open_Duck_Playground/tests/validate_onnx_simulation.py line 114
-    # Maximum motor velocity limit (rad/s) for rate limiting joint commands
+    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py (MjInfer.__init__)
+    # Maximum motor velocity limit (rad/s) for rate limiting joint commands (self.max_motor_velocity)
     max_motor_velocity: 5.24
-    # Source: Open_Duck_Playground/tests/validate_onnx_simulation.py line 116
-    # Joint velocity scaling factor for observation (dof_vel_scale)
-    # dof_vel_scale: 0.05
+    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py (MjInfer.__init__ + get_obs)
+    # Joint velocity scaling factor for observation (dof_vel_scale): obs includes (joint_vel * dof_vel_scale)
     dof_vel_scale: 0.05
 
     # Reference motion blending
@@ -190,12 +187,12 @@ motion_controller:
     #          neck_pitch, head_pitch, head_yaw, head_roll,
     #          right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle]
     default_joint_positions: [0.002, 0.053, -0.63, 1.368, -0.784, 0.0, 0.0, 0.0, 0.0, -0.003, -0.065, 0.635, 1.379, -0.796]
-    
-    # Default actuator values (default_actuator) - same as default_joint_positions
-    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 121-123
-    # motor_targets and prev_motor_targets are initialized to default_actuator at startup
-    # Reference: validate_onnx_simulation.py lines 124-125: motor_targets = default_actuator, prev_motor_targets = default_actuator
-    # Used for motor target initialization consistency with reference implementation
+
+    # Default actuator values (default_actuator) used to initialize motor targets at startup.
+    # Value source (MuJoCo model): keyframe "home" ctrl, e.g.
+    # Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml (<key name="home" ctrl="...">)
+    # Consumption (Python sim): Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py
+    # sets default_actuator = model.keyframe("home").ctrl, and motor_targets/prev_motor_targets = default_actuator.
     default_actuator: [0.002, 0.053, -0.63, 1.368, -0.784, 0.0, 0.0, 0.0, 0.0, -0.003, -0.065, 0.635, 1.379, -0.796]
 
     # Head joint indices (receive additional head commands from velocity_commands[3:7])
@@ -207,7 +204,8 @@ motion_controller:
     # IMU sensor configuration
     # Source: ros2_control xacro open_duck_mini.ros2_control.xacro sensor name "imu"
     # Sensor name matches MuJoCo site name in open_duck_mini_v2.xml
-    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 110
+    # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 110    # Controller for data collection: accepts joint position commands
+    # Used by collect_ros2_data.py to publish reference motion actions
     imu_sensor_name: "imu"
     # MuJoCo accelerometer reports negative z when standing (ground pushes down in sensor frame)
     # Set to false to not invert z-axis to match expected +9.8 m/s² for standing robot
@@ -250,8 +248,8 @@ motion_controller:
 
 forward_command_controller:
   ros__parameters:
-    # Controller for data collection: accepts joint position commands
-    # Used by collect_ros2_data.py to publish reference motion actions
+    # Direct joint-position command controller (writes to each joint's `position` command interface).
+    # Useful for data collection / trajectory replay (e.g. collect_ros2_data.py) and scripted motion in simulation.
     type: forward_command_controller/ForwardCommandController
     joints:
       - left_hip_yaw

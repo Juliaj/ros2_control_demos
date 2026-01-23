@@ -16,10 +16,10 @@
 #
 # Authors: Julia Jia
 
-import os
-
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterFile, ParameterValue
@@ -27,6 +27,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    controller_name = LaunchConfiguration("controller_name")
 
     # NOTE: URDF is loaded ONLY for robot_state_publisher to compute TF transforms.
     # The actual robot model for simulation is loaded by MuJoCo from scene.xml via
@@ -48,7 +49,9 @@ def generate_launch_description():
         ]
     )
 
-    robot_description = {"robot_description": ParameterValue(value=robot_description_content, value_type=str)}
+    robot_description = {
+        "robot_description": ParameterValue(value=robot_description_content, value_type=str)
+    }
 
     controller_parameters = ParameterFile(
         PathJoinSubstitution(
@@ -103,8 +106,7 @@ def generate_launch_description():
         output="both",
     )
 
-    # Spawn motion_controller (active by default)
-    # Controls robot joints using ONNX model inference
+    # Spawn motion_controller: controls robot joints using ONNX model inference
     spawn_motion_controller = Node(
         package="controller_manager",
         executable="spawner",
@@ -113,15 +115,44 @@ def generate_launch_description():
             "motion_controller",
         ],
         output="both",
+        condition=IfCondition(
+            PythonExpression(["'", controller_name, "' == 'motion_controller'"])
+        ),
+    )
+
+    # Spawn forward_command_controller: direct joint position command interface.
+    # Useful for data collection / scripted trajectories in simulation.
+    # Tip: you can use Open_Duck_Playground's headless MuJoCo driver to generate action trajectories
+    # (policy inference -> action -> motor_targets) and publish those joint targets into ROS2:
+    # https://github.com/Juliaj/Open_Duck_Playground/blob/adapt_to_rtx5090/tests/validate_onnx_simulation.py
+    spawn_forward_command_controller = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawn_forward_command_controller",
+        arguments=[
+            "forward_command_controller",
+        ],
+        output="both",
+        condition=IfCondition(
+            PythonExpression(["'", controller_name, "' == 'forward_command_controller'"])
+        ),
     )
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "controller_name",
+                default_value="motion_controller",
+                description=(
+                    "Which controller to spawn: "
+                    "'motion_controller' (ONNX policy) or 'forward_command_controller' (direct joint position commands)."
+                ),
+            ),
             robot_state_publisher_node,
             control_node,
             spawn_joint_state_broadcaster,
             spawn_state_interfaces_broadcaster,
             spawn_motion_controller,
+            spawn_forward_command_controller,
         ]
     )
-

@@ -1,24 +1,58 @@
 Design
 ======
 
-Scenario
+Overview
 --------
 
-Control a Open Duck Mini robot to walk forward using geometry_msgs/Twist messages. An ONNX ML model generates joint position commands to achieve the desired locomotion.
+This demo controls an Open Duck Mini robot to walk using velocity commands. The system uses an ONNX machine learning model to generate joint position commands for locomotion.
+
+The control pipeline follows three main stages:
+
+1. **Observation Formatter**: Formats sensor data (IMU, joint states, velocity commands) into an observation vector matching the ONNX model's expected input format.
+
+2. **ONNX Model Inference**: Runs the trained policy model to generate raw action outputs.
+
+3. **Action Formatter**: Processes the model outputs by scaling, clamping to joint limits, applying rate limiting, and blending with reference motions before sending commands to hardware.
+
+The system runs at 50 Hz (0.02s period) with a simulation timestep of 0.002s, resulting in an implicit decimation of 10 simulation steps per control update, matching the reference implementation.
 
 Architecture
 ------------
 
 The system consists of two main components:
 
-1. state_interfaces_broadcaster: Aggregates hardware state interfaces into a control_msgs/Float64Values topic, including IMU data and joint states.
+1. **state_interfaces_broadcaster**: Aggregates hardware state interfaces into a control_msgs/Float64Values topic, including IMU data and joint states.
 
-2. MotionController: A ros2_control controller that subscribes to sensor data and velocity commands, formats observations, runs ONNX inference, and writes joint position commands to hardware.
+2. **MotionController**: A ros2_control controller that subscribes to sensor data and velocity commands, formats observations, runs ONNX inference, and writes joint position commands to hardware.
 
+Data Flow
+---------
 
-Challenges:
+.. code-block:: text
 
-Setup 1: Python inference in Mujoco directly: The robot walks forward.
+   [MuJoCo Simulator]
+       ↓ (joint states, IMU data, contact sensors)
+   [Hardware Interface]
+       ↓ (state interfaces)
+   [State Interfaces Broadcaster]
+       ↓ (ROS2 topic: /state_interfaces_broadcaster/values)
+   [Motion Controller]
+       ↑ (ROS2 topic: /motion_controller/cmd_vel - velocity commands)
+       ↓ (ONNX inference)
+       ↓ (command interfaces - joint position commands)
+   [Hardware Interface]
+       ↓ (joint commands)
+   [MuJoCo Simulator]
+
+Challenges
+----------
+
+During development, several challenges were encountered when porting the Python reference implementation to ROS2:
+
+Setup 1: Python inference in Mujoco directly
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The robot walks forward successfully.
 
 .. raw:: html
 
@@ -29,13 +63,23 @@ Setup 1: Python inference in Mujoco directly: The robot walks forward.
 
 `Video: python_mujoco.mp4 <imgs/python_mujoco.mp4>`_
 
+First, clone the Open_Duck_Playground repository with the required branch:
+
+.. code-block:: bash
+
+   git clone -b adapt_to_rtx5090 https://github.com/Juliaj/Open_Duck_Playground.git ~/dev/Open_Duck_Playground
+
 Terminal 1:
 
 .. code-block:: bash
 
-   uv run python tests/validate_onnx_simulation.py --onnx checkpoints/2025_12_26_165635_300482560.onnx --viewer --fall-duration-steps 5000
+   cd ~/dev/Open_Duck_Playground
+   uv run python tests/validate_onnx_simulation.py --onnx checkpoints/2025_12_26_165635_300482560.onnx --viewer --fall-duration-steps 150000
 
-Setup 2: forward_command_controller in mujoco_ros2_control simulation with Python inference code, duck walks forward somehow but in circles.
+Setup 2: forward_command_controller in mujoco_ros2_control simulation with Python inference code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The duck walks forward but in circles.
 
 .. raw:: html
 
@@ -52,17 +96,19 @@ Terminal 1:
 
 .. code-block:: bash
 
-   ros2 launch ros2_control_demo_example_18 data_collection.launch.py
+   ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py controller_name:=forward_command_controller
 
 Terminal 2:
 
 .. code-block:: bash
 
-   uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/fine_tuning/manual_control_ros2.py \
-     --output mujoco_manual_data.h5 \
-     --onnx-model ~/dev/Open_Duck_Playground/checkpoints/2025_12_26_165635_300482560.onnx
+   uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/bringup/launch/onnx_infer_ros2.py \
+     --onnx-model ~/update_me/example_18/onnx_model/2025_12_26_165635_300482560.onnx
 
-Setup 3: Motion controller in mujoco_ros2_control, action is driven by MotionController: The robot doesn't walk forward, rather moves its feet in place.
+Setup 3: Motion controller in mujoco_ros2_control
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The robot doesn't walk forward, rather moves its feet in place.
 
 .. raw:: html
 
@@ -85,23 +131,21 @@ Terminal 2:
 
    python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/launch/test_motions.py
 
+Debug Support
+-------------
 
+The controller includes comprehensive debug support to aid in troubleshooting:
 
-Data Flow
----------
+- Debug topic publishers for observations, actions, and intermediate processing steps
+- Action quality metrics reporting (clamping rates, action smoothness, extreme actions)
+- Throttled logging for observation formatting, action processing, and rate limiting
+- ONNX model metadata validation and dimension mismatch detection
+- Detailed logging of motor targets, reference motion blending, and command writing
 
-.. code-block:: text
+These debug features can be enabled via ROS2 logging levels and are documented in the user documentation.
 
-   Hardware State Interfaces
-       ↓
-   state_interfaces_broadcaster → control_msgs/Float64Values topic
-       ↓
-   LocomotionController
-       ↓ (ONNX inference)
-   Hardware Command Interfaces
-
-LocomotionController
---------------------
+MotionController Details
+------------------------
 
 Update Rate: 50 Hz
 
@@ -121,7 +165,8 @@ This matches the reference implementation exactly. Actions are applied at each c
 Motor velocity limits are calculated using the controller period:
 ``max_change = max_motor_velocity * dt = 5.24 * 0.02 = 0.1048 rad per control period``
 
-Inputs:
+Inputs
+~~~~~~
 
 - Sensor data from state_interfaces_broadcaster/values topic:
   - Base angular velocity (from IMU)
@@ -132,7 +177,8 @@ Inputs:
 
 - Previous action (stored internally)
 
-Processing:
+Processing
+~~~~~~~~~~
 
 - Format observation vector for ONNX model
 - Run inference using ONNX model
@@ -153,14 +199,6 @@ The observation vector is concatenated in this order:
 
 Total dimension: 10 + 3*N (where N = number of leg joints)
 
-Gazebo Integration
-------------------
-
-The gz_ros2_control/GazeboSimSystem plugin handles Gazebo communication:
-
-- Reads joint positions/velocities from simulation
-- Reads IMU data from Gazebo IMU sensors
-- Writes joint position commands to Gazebo actuators
 
 Hardware Layer
 --------------
@@ -171,35 +209,27 @@ Hardware Layer
 MuJoCo Model Selection
 -----------------------
 
-The simulation uses robot_motors.xml which includes motor actuators with BAM-identified parameters (damping, armature, frictionloss). This matches the actuator dynamics used during ONNX model training, ensuring sim-to-real transfer accuracy.
+The simulation uses ``open_duck_mini_v2.xml`` which includes motor actuators with BAM-identified parameters (damping, armature, frictionloss). This matches the actuator dynamics used during ONNX model training, ensuring sim-to-real transfer accuracy.
 
-Checking sim2real.md and the ONNX model setup to confirm the actuator configuration.
+The model is loaded via ``scene.xml``, which includes ``open_duck_mini_v2.xml`` (line 6). The BAM-identified parameters for STS3215 servos are defined in the ``sts3215`` default class:
 
-Use `robot_motors.xml` (via `scene.xml`)
+- ``damping="0.56"``
+- ``armature="0.027"``
+- ``frictionloss="0.068"``
+- ``kp="13.37"`` (position gain)
+- ``forcerange="-3.23 3.23"`` (N⋅m)
 
-Observations: 
-1. Training configuration: `sim2real.md` states BAM-identified parameters (damping, armature, frictionloss) are set in the MJCF. `robot_motors.xml` includes these:
-   - `damping="0.0"`, `armature="0.027"`, `frictionloss="0.083"` (line 69)
-2. Scene files:
-   - `scene.xml` includes `robot_motors.xml` (line 6)
-   - `scene_position.xml` includes `robot.xml` (line 5)
-3. ONNX testing: `experiments/v2/onnx_AWD_mujoco.py` uses `scene.xml` (line 70), which loads `robot_motors.xml`.
-4. Actuator type: `robot_motors.xml` uses `<motor>` actuators, matching the BAM-identified motor model used during training.
-
-Design decision: Use `robot_motors.xml` (via `scene.xml`) to match the training setup and BAM parameters. This ensures the ONNX model sees the same actuator dynamics it was trained on.
+These parameters are embedded directly in ``open_duck_mini_v2.xml`` (line 47) and match the actuator dynamics used during ONNX model training. The model uses MuJoCo's built-in position actuators, ensuring the same control behavior as the reference implementation.
 
 Controller Manager
 ------------------
 
 - Runs control loop at 50 Hz
-- Manages lifecycle of state_interfaces_broadcaster and LocomotionController
+- Manages lifecycle of state_interfaces_broadcaster and MotionController
 
 User Command Interface
-----------------------
+-----------------------
 
 Publish geometry_msgs/Twist messages to the velocity command topic (default: ~/cmd_vel).
 
 Example: To command forward walking at 0.5 m/s, publish Twist with linear.x = 0.5, linear.y = 0.0, angular.z = 0.0. The controller formats this as [0.5, 0.0, 0.0, 0.0] (lin_vel_x, lin_vel_y, ang_vel_z, heading) and includes it in the observation vector.
-
-
-https://docs.google.com/document/d/1RVRAUgEUzKis0tg4bWb-FpZigZ4RG5k669Oa3MTUaKE/edit?usp=drive_link

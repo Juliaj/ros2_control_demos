@@ -96,22 +96,22 @@ def generate_launch_description():
         output="both",
         parameters=[robot_description],
     )
-    rviz_config_file = PathJoinSubstitution(
-        [
-            FindPackageShare(description_package),
-            "description",
-            "launch",
-            "open_duck_mini.rviz",
-        ]
-    )
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        # arguments=["-d", rviz_config_file],
-        condition=IfCondition(gui),
-    )
+    # rviz_config_file = PathJoinSubstitution(
+    #     [
+    #         FindPackageShare(description_package),
+    #         "description",
+    #         "launch",
+    #         "open_duck_mini.rviz",
+    #     ]
+    # )
+    # rviz_node = Node(
+    #     package="rviz2",
+    #     executable="rviz2",
+    #     name="rviz2",
+    #     output="log",
+    #     # arguments=["-d", rviz_config_file],
+    #     condition=IfCondition(gui),
+    # )
 
     nodes = [
         joint_state_publisher_node,

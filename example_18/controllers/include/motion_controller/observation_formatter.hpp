@@ -81,22 +81,26 @@ public:
   // Update imitation phase (increments phase counter and computes cos/sin)
   void update_imitation_phase(double phase_frequency_factor);
 
-  // Set imitation phase counter directly (for state injection)
-  void set_imitation_i(double imitation_i);
-
   // Get imitation phase values [cos, sin]
   std::vector<double> get_imitation_phase() const { return imitation_phase_; }
 
-  // Get imitation phase counter (for logging/debugging)
+  // Debugging-only methods (for diagnosing ONNX inference quality issues):
+
+  // Set imitation phase counter directly (for state injection/debugging)
+  // Used to inject specific phase values when comparing ROS2 vs MuJoCo observations
+  void set_imitation_i(double imitation_i);
+
+  // Get imitation phase counter (debugging only)
   // Imitation: gait phase counter (0 to phase_period_) tracking position in walking cycle.
-  // Used to encode rhythmic leg coordination via [cos(θ), sin(θ)] where θ = (imitation_i / phase_period_) * 2π.
-  // The model was trained with imitation learning to follow reference gait patterns.
+  // Used to encode rhythmic leg coordination via [cos(θ), sin(θ)] where θ = (imitation_i /
+  // phase_period_) * 2π. The model was trained with imitation learning to follow reference gait
+  // patterns.
   double get_imitation_i() const { return imitation_i_; }
 
-  // Get phase period (for logging/debugging)
+  // Get phase period (debugging only)
   double get_phase_period() const { return phase_period_; }
 
-  // Get action history for debugging
+  // Get action history (debugging only)
   std::vector<double> get_last_action() const { return last_action_; }
   std::vector<double> get_last_last_action() const { return last_last_action_; }
   std::vector<double> get_last_last_last_action() const { return last_last_last_action_; }
@@ -112,7 +116,8 @@ public:
   // Set to true to invert z-axis to match expected +9.8 m/s² for standing robot
   void set_imu_upside_down(bool upside_down) { imu_upside_down_ = upside_down; }
 
-  // Skip IMU z-axis inversion for injected data (data from Python already in correct format)
+  // Skip IMU z-axis inversion for injected data (debugging only)
+  // Used when injecting state from Python/MuJoCo for comparing ROS2 vs MuJoCo observations.
   // When true, z-acceleration is not inverted even if imu_upside_down_ is true
   void set_skip_imu_inversion(bool skip) { skip_imu_inversion_ = skip; }
 
@@ -156,7 +161,7 @@ private:
   // IMU upside down flag (inverts z-acceleration if true)
   bool imu_upside_down_;
 
-  // Skip IMU inversion flag (for injected data from Python that's already in correct format)
+  // Skip IMU inversion flag (debugging only: for injected data from Python/MuJoCo)
   bool skip_imu_inversion_;
 
   // Gyro deadband threshold (rad/s) - values below this are set to zero

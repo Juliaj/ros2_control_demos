@@ -34,8 +34,11 @@ ActionProcessor::ActionProcessor(
     throw std::invalid_argument("Joint names cannot be empty");
   }
 
-  // Default head joint indices (5-9 for Open Duck Mini, 4 head joints)
-  // These correspond to motor_targets[5:9] in Python (line 310-311)
+  // Default head joint indices (unused: kept for potential future use)
+  // Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py lines 147-150
+  // (commands[3:7] for neck_pitch, head_pitch, head_yaw, head_roll)
+  // NOTE: Currently unused - head commands are in observation but not applied to override model
+  // outputs (matching mujoco_infer.py where head override is commented out at lines 229-230)
   if (num_joints_ >= 9)
   {
     head_joint_indices_ = {5, 6, 7, 8};
@@ -65,6 +68,8 @@ std::vector<double> ActionProcessor::process(
   for (size_t i = 0; i < num_joints_; ++i)
   {
     // Apply scaling: model outputs are scaled by action_scale (default: 0.25)
+    // Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 31
+    // (action_scale = 0.25)
     double scaled_action = model_outputs[i] * action_scale_;
 
     // Add default offset if enabled (model outputs are relative to default positions)
@@ -74,37 +79,6 @@ std::vector<double> ActionProcessor::process(
     }
 
     processed_actions.push_back(scaled_action);
-  }
-
-  return processed_actions;
-}
-
-std::vector<double> ActionProcessor::process_with_head_commands(
-  const std::vector<double> & model_outputs, const std::vector<double> & default_joint_positions,
-  const std::vector<double> & head_commands)
-{
-  // First, process actions normally (scale and add default offset)
-  std::vector<double> processed_actions = process(model_outputs, default_joint_positions);
-
-  // Validate head commands size
-  if (head_commands.size() != head_joint_indices_.size())
-  {
-    throw std::invalid_argument(
-      "Head commands size (" + std::to_string(head_commands.size()) +
-      ") does not match number of head joints (" + std::to_string(head_joint_indices_.size()) +
-      ")");
-  }
-
-  // Add head commands to head joint targets (line 310-311 in v2_rl_walk_mujoco.py)
-  // head_motor_targets = self.last_commands[3:] + self.motor_targets[5:9]
-  // self.motor_targets[5:9] = head_motor_targets
-  for (size_t i = 0; i < head_joint_indices_.size(); ++i)
-  {
-    size_t joint_idx = head_joint_indices_[i];
-    if (joint_idx < processed_actions.size())
-    {
-      processed_actions[joint_idx] += head_commands[i];
-    }
   }
 
   return processed_actions;

@@ -226,7 +226,7 @@ TEST_F(TestObservationFormatter, ImuUpsideDownInversion)
   // Set IMU accelerometer (indices 7-9)
   // Simulate MuJoCo's behavior: negative z when standing
   interface_data.values[7] = 0.5;   // accel x
-  interface_data.values[8] = -0.3; // accel y
+  interface_data.values[8] = -0.3;  // accel y
   interface_data.values[9] = -9.8;  // accel z (negative when standing)
 
   // Set default joint positions
@@ -247,8 +247,8 @@ TEST_F(TestObservationFormatter, ImuUpsideDownInversion)
   // Verify accelerometer values (indices 3-5)
   // x-axis: 0.5 + 1.3 (bias) = 1.8
   EXPECT_FLOAT_EQ(observation_no_invert[3], 1.8f);   // accel x + bias
-  EXPECT_FLOAT_EQ(observation_no_invert[4], -0.3f); // accel y (no change)
-  EXPECT_FLOAT_EQ(observation_no_invert[5], -9.8f);   // accel z (no inversion)
+  EXPECT_FLOAT_EQ(observation_no_invert[4], -0.3f);  // accel y (no change)
+  EXPECT_FLOAT_EQ(observation_no_invert[5], -9.8f);  // accel z (no inversion)
 
   // Test 2: imu_upside_down = true (invert z-axis)
   formatter_->set_imu_upside_down(true);
@@ -259,7 +259,7 @@ TEST_F(TestObservationFormatter, ImuUpsideDownInversion)
   // x-axis: 0.5 + 1.3 (bias) = 1.8 (unchanged)
   EXPECT_FLOAT_EQ(observation_invert[3], 1.8f);   // accel x + bias (unchanged)
   EXPECT_FLOAT_EQ(observation_invert[4], -0.3f);  // accel y (unchanged)
-  EXPECT_FLOAT_EQ(observation_invert[5], 9.8f);    // accel z (inverted: -(-9.8) = +9.8)
+  EXPECT_FLOAT_EQ(observation_invert[5], 9.8f);   // accel z (inverted: -(-9.8) = +9.8)
 
   // Verify x and y are not affected by inversion
   EXPECT_FLOAT_EQ(observation_no_invert[3], observation_invert[3]);

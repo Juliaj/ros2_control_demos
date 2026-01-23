@@ -97,14 +97,14 @@ std::vector<float> ObservationFormatter::format(
   }
 
   // 2. IMU accelerometer (3D)
-  // Apply bias to match MuJoCo training data (Playground, mujoco_infer.py line 74: accelerometer[0] += 1.3)
-  // If imu_upside_down is true, invert z-axis (MuJoCo reports negative z when standing)
+  // Apply bias to match MuJoCo training data (Playground, mujoco_infer.py line 74: accelerometer[0]
+  // += 1.3) If imu_upside_down is true, invert z-axis (MuJoCo reports negative z when standing)
   if (accelero.size() != 3)
   {
     throw std::runtime_error(
       "Accelerometer size mismatch: expected 3, got " + std::to_string(accelero.size()));
   }
-  
+
   // Warn if accelerometer data appears to be uninitialized (all zeros except x-bias)
   // This happens when interface data is incomplete at startup (count < 10)
   static bool warned_about_zero_accel = false;
@@ -114,28 +114,29 @@ std::vector<float> ObservationFormatter::format(
     RCLCPP_WARN(
       logger,
       "IMU accelerometer data is zero (interface data incomplete). "
-      "This is normal at startup but should resolve once state_interfaces_broadcaster publishes complete data. "
+      "This is normal at startup but should resolve once state_interfaces_broadcaster publishes "
+      "complete data. "
       "Observation will show [1.3, 0.0, 0.0] until IMU data is available.");
     warned_about_zero_accel = true;
   }
-  
-  // Apply x-axis bias to match MuJoCo training data / reference implementation.
+
+  // Apply x-axis bias to match MuJoCo training data (mujoco_infer.py line 74).
   observation.push_back(static_cast<float>(accelero[0] + 1.3));
   observation.push_back(static_cast<float>(accelero[1]));
   // Invert z-acceleration if IMU is upside down (MuJoCo reports -9.8 when standing, should be +9.8)
   // Skip inversion if using injected data (data from Python already in correct format)
   bool should_invert = imu_upside_down_ && !skip_imu_inversion_;
-  
+
   // Debug logging (throttled to avoid spam)
   static rclcpp::Clock clock;
   static auto logger = rclcpp::get_logger("observation_formatter");
-  RCLCPP_INFO_THROTTLE(logger, clock, 1000,
-                       "[OBS_FORMAT] accel_z_raw=%.6f, imu_upside_down=%s, skip_imu_inversion=%s, should_invert=%s, result=%.6f",
-                       accelero[2], imu_upside_down_ ? "true" : "false",
-                       skip_imu_inversion_ ? "true" : "false",
-                       should_invert ? "true" : "false",
-                       should_invert ? -accelero[2] : accelero[2]);
-  
+  RCLCPP_INFO_THROTTLE(
+    logger, clock, 1000,
+    "[OBS_FORMAT] accel_z_raw=%.6f, imu_upside_down=%s, skip_imu_inversion=%s, should_invert=%s, "
+    "result=%.6f",
+    accelero[2], imu_upside_down_ ? "true" : "false", skip_imu_inversion_ ? "true" : "false",
+    should_invert ? "true" : "false", should_invert ? -accelero[2] : accelero[2]);
+
   float accel_z_processed = static_cast<float>(should_invert ? -accelero[2] : accelero[2]);
   observation.push_back(accel_z_processed);
 
@@ -184,7 +185,7 @@ std::vector<float> ObservationFormatter::format(
   // 10. Feet contacts (2D)
   double left_contact = left_contact_;
   double right_contact = right_contact_;
-  
+
   observation.push_back(static_cast<float>(left_contact));
   observation.push_back(static_cast<float>(right_contact));
 
@@ -356,8 +357,8 @@ void ObservationFormatter::extract_interface_data(
     "gyro=[%.4f, %.4f, %.4f], accel=[%.4f, %.4f, %.4f]",
     imu_gyro_found[0] ? "yes" : "no", imu_gyro_found[1] ? "yes" : "no",
     imu_gyro_found[2] ? "yes" : "no", imu_accel_found[0] ? "yes" : "no",
-    imu_accel_found[1] ? "yes" : "no", imu_accel_found[2] ? "yes" : "no", gyro[0], gyro[1],
-    gyro[2], accelero[0], accelero[1], accelero[2]);
+    imu_accel_found[1] ? "yes" : "no", imu_accel_found[2] ? "yes" : "no", gyro[0], gyro[1], gyro[2],
+    accelero[0], accelero[1], accelero[2]);
 
   if (!imu_gyro_found[0] || !imu_gyro_found[1] || !imu_gyro_found[2])
   {
@@ -425,7 +426,7 @@ void ObservationFormatter::format_joint_velocities_scaled(
   }
 
   // Joint velocities (N joints, scaled by 0.05)
-  // Reference: Open Duck Mini v2_rl_walk_mujoco.py line 162: dof_vel * 0.05
+  // Reference: mujoco_infer.py line 162: dof_vel * 0.05
   const double velocity_scale = 0.05;
   for (size_t i = 0; i < num_joints_; ++i)
   {
@@ -467,11 +468,11 @@ void ObservationFormatter::set_feet_contacts(double left_contact, double right_c
 
 void ObservationFormatter::update_imitation_phase(double phase_frequency_factor)
 {
-  // Increment phase counter (line 257-260 in v2_rl_walk_mujoco.py)
+  // Increment phase counter (line 257-260 in mujoco_infer.py)
   imitation_i_ += 1.0 * phase_frequency_factor;
   imitation_i_ = std::fmod(imitation_i_, phase_period_);
 
-  // Compute cos/sin encoding (line 261-270 in v2_rl_walk_mujoco.py)
+  // Compute cos/sin encoding (line 261-270 in mujoco_infer.py)
   const double PI = 3.14159265358979323846;
   double theta = (imitation_i_ / phase_period_) * 2.0 * PI;
   imitation_phase_[0] = std::cos(theta);
@@ -481,7 +482,7 @@ void ObservationFormatter::update_imitation_phase(double phase_frequency_factor)
 void ObservationFormatter::set_imitation_i(double imitation_i)
 {
   imitation_i_ = std::fmod(imitation_i, phase_period_);
-  
+
   // Recompute cos/sin encoding
   const double PI = 3.14159265358979323846;
   double theta = (imitation_i_ / phase_period_) * 2.0 * PI;
