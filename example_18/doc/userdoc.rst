@@ -104,19 +104,13 @@ The demo supports two controller modes. Each mode has its own launch command and
 
       ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py controller_name:=motion_controller
 
-   Check that controllers are running:
-
-   .. code-block:: bash
-
+      # Check that controllers are running:
       ros2 control list_controllers
 
-   Send velocity commands using the test script:
-
-   .. code-block:: bash
-
+      # Send velocity commands using the test script:
       python3 $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/launch/test_motions.py
 
-   The script publishes velocity commands at 50 Hz and includes warm-up time for controller stabilization and blend-in.
+   The script publishes velocity commands at 50 Hz and includes warm-up time for controller stabilization and blend-in. You should see the duck moving its feet.
 
 2. Forward Command Controller (direct joint position commands)
 
@@ -126,24 +120,21 @@ The demo supports two controller modes. Each mode has its own launch command and
 
       ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py controller_name:=forward_command_controller
 
-   Check that controllers are running:
-
-   .. code-block:: bash
-
+      # Check that controllers are running:
       ros2 control list_controllers
 
-   Send commands using the ONNX inference script which needs to be run under Open_Duck_Playground environment:
-
-   First, clone the Open_Duck_Playground repository with the required branch:
+   Send commands using the ONNX inference script which needs to be run under Open_Duck_Playground environment. First, clone the Open_Duck_Playground repository with the required branch:
 
    .. code-block:: bash
 
       git clone -b adapt_to_rtx5090 https://github.com/Juliaj/Open_Duck_Playground.git ~/dev/Open_Duck_Playground
 
-   Then run the ONNX inference script:
+   Then run the ONNX inference script from another terminal:
 
    .. code-block:: bash
 
-      uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/bringup/launch/onnx_infer_ros2.py --onnx-model /update_me/example_18/onnx_model/open_duck_mini_v2.onnx
+      cd ~/dev/Open_Duck_Playground
+   
+      uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/bringup/launch/onnx_infer_ros2.py --onnx-model /update_me/example_18/onnx_model/2025_12_26_165635_300482560.onnx
 
    The script uses ONNX model inference to generate joint actions based on observations. It allows manual keyboard control of velocity commands and publishes joint position commands to the forward_command_controller. Press 'O' to enable ONNX model control, and use arrow keys or WASD to adjust velocity commands.
