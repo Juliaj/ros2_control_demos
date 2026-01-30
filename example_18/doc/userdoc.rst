@@ -96,8 +96,7 @@ Run the demo
 
 The demo supports two controller modes. Each mode has its own launch command and corresponding test script.
 
-a. Motion Controller (ONNX policy)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Motion Controller (ONNX policy)
 
    Launch MuJoCo simulation with motion controller:
 
@@ -119,8 +118,7 @@ a. Motion Controller (ONNX policy)
 
    The script publishes velocity commands at 50 Hz and includes warm-up time for controller stabilization and blend-in.
 
-b. Forward Command Controller (direct joint position commands)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2. Forward Command Controller (direct joint position commands)
 
    Launch MuJoCo simulation with forward command controller:
 
