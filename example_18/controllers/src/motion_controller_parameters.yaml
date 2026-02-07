@@ -1,0 +1,116 @@
+motion_controller:
+  # Core controller parameters
+  joints: {
+    type: string_array,
+    description: "Names of the joints to control",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+  model_path: {
+    type: string,
+    description: "Path to the ML model file (e.g., ONNX model)",
+    validation: {
+      not_empty<>: []
+    },
+    read_only: true
+  }
+
+  # ROS2 topic configuration
+  interfaces_broadcaster_topic: {
+    type: string,
+    default_value: "state_interfaces_broadcaster/values",
+    description: "Topic name from state_interfaces_broadcaster"
+  }
+  velocity_command_topic: {
+    type: string,
+    default_value: "~/cmd_velocity_with_head",
+    description: "Topic name for velocity commands (custom message: example_18_motion_controller_msgs/VelocityCommandWithHead). Contains base_velocity (geometry_msgs/Twist) and head_commands (float64[4] for neck_pitch, head_pitch, head_yaw, head_roll in radians). This extends standard cmd_vel with additional head joint position commands."
+  }
+  feet_contact_topic: {
+    type: string,
+    default_value: "~/feet_contacts",
+    description: "Topic name for feet contact sensor data (2D: left, right)"
+  }
+
+  # Action processing parameters
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
+  action_scale: {
+    type: double,
+    default_value: 0.25,
+    description: "Scale factor for model outputs. Source: mujoco_infer.py line 31 (action_scale = 0.25), line 213 (motor_targets = default_actuator + action * self.action_scale). NOTE: manual_control_ros2.py uses 0.3, but C++ defaults to 0.25 to match mujoco_infer.py"
+  }
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml and mujoco_infer_base.py
+  default_joint_positions: {
+    type: double_array,
+    default_value: [],
+    description: "Default joint positions (init_pos) for relative position calculation. If empty, initialized from sensor data. Source: scene_flat_terrain.xml keyframe(\"home\").ctrl (lines 59-74), mujoco_infer_base.py lines 121-123 (default_actuator = model.keyframe(\"home\").ctrl)"
+  }
+  # IMU sensor configuration
+  # Source: ros2_control xacro open_duck_mini.ros2_control.xacro sensor name "imu"
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer_base.py line 110
+  imu_sensor_name: {
+    type: string,
+    default_value: "imu",
+    description: "Name of the IMU sensor for gyro and accelerometer data. Matches ros2_control xacro sensor name and MuJoCo site name in open_duck_mini_v2.xml"
+  }
+  # Source: MuJoCo accelerometer behavior
+  imu_upside_down: {
+    type: bool,
+    default_value: false,
+    description: "Whether to invert IMU z-acceleration. MuJoCo accelerometer reports negative z when standing (ground pushes down in sensor frame). Set to false to not invert z-axis to match expected +9.8 m/s² for standing robot"
+  }
+
+  # Control state parameters (debugging/unused: not implemented in controller)
+  start_paused: {
+    type: bool,
+    default_value: false,
+    description: "Start controller in paused state (robot will not move until unpaused). NOTE: Not currently used - pause functionality is not implemented in C++ controller."
+  }
+
+  # Gait phase parameters
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
+  phase_frequency_factor_offset: {
+    type: double,
+    default_value: 0.0,
+    description: "Offset to gait phase frequency factor (affects walking speed). Added to base factor 1.0. Source: mujoco_infer.py line 60 (phase_frequency_factor = 1.0), line 176 (imitation_i += 1.0 * self.phase_frequency_factor)"
+  }
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
+  phase_period: {
+    type: double,
+    default_value: 50.0,
+    description: "Number of steps in one gait cycle period (PRM.nb_steps_in_period). Source: mujoco_infer.py line 178 (imitation_i % self.PRM.nb_steps_in_period)"
+  }
+
+  # Action filtering (debugging/unused: action filter is not implemented in C++ controller)
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py line 33 (action_filter created but commented out at lines 205-206)
+  cutoff_frequency: {
+    type: double,
+    default_value: 37.5,
+    description: "Cutoff frequency for low-pass action filter (Hz). 0.0 = no filtering. NOTE: Not currently used - action filter is not implemented in C++ controller. Source: mujoco_infer.py line 33 (LowPassActionFilter with cutoff_frequency=37.5, but filter is commented out at lines 205-206)"
+  }
+  # Motor velocity limit
+  # Source: Open_Duck_Playground/playground/open_duck_mini_v2/mujoco_infer.py
+  max_motor_velocity: {
+    type: double,
+    default_value: 5.24,
+    description: "Maximum motor velocity in rad/s. Prevents exceeding physical motor capability. Source: mujoco_infer.py line 58 (max_motor_velocity = 5.24). NOTE: manual_control_ros2.py uses 8.0, but C++ defaults to 5.24 to match mujoco_infer.py"
+  }
+  # Gyro deadband filtering
+  gyro_deadband: {
+    type: double,
+    default_value: 0.15,
+    description: "Gyro deadband threshold in rad/s. Values below this are set to zero to filter drift/noise."
+  }
+  # Stabilization and blend-in
+  stabilization_delay: {
+    type: int,
+    default_value: 50,
+    description: "Number of steps to wait before applying ONNX actions (stabilization period)."
+  }
+  blend_in_steps: {
+    type: int,
+    default_value: 200,
+    description: "Number of steps to gradually blend in ONNX actions after stabilization."
+  }

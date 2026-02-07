@@ -87,6 +87,10 @@ The following examples are part of this demo repository:
 
    This example shows how to publish diagnostics from a hardware component using the Executor passed from Controller Manager.
 
+* Example 18: ["Open Duck Mini with MuJoCo simulation and ONNX policy"](example_18)
+
+   This example demonstrates a biped robot (Open Duck Mini) running in MuJoCo simulation with an ONNX-based locomotion policy. It uses `mujoco_ros2_control` hardware interface and shows integration with state interfaces broadcaster for sensor data aggregation.
+
 ## Structure
 
 The repository is structured into `example_XY` folders that fully contained packages with names `ros2_control_demos_example_XY`.
@@ -123,6 +127,37 @@ ROS 2 Distro | Branch | Build status | Documentation
 **Kilted** | [`master`](https://github.com/ros-controls/ros2_control_demos/tree/master) | see above | [Documentation](https://control.ros.org/kilted/doc/ros2_control_demos/doc/index.html)
 **Jazzy** | [`jazzy`](https://github.com/ros-controls/ros2_control_demos/tree/jazzy) | [![Jazzy Binary Build](https://github.com/ros-controls/ros2_control_demos/actions/workflows/jazzy-binary-build.yml/badge.svg?branch=master)](https://github.com/ros-controls/ros2_control_demos/actions/workflows/jazzy-binary-build.yml?branch=master) <br> [![Jazzy Semi-Binary Build](https://github.com/ros-controls/ros2_control_demos/actions/workflows/jazzy-semi-binary-build.yml/badge.svg?branch=master)](https://github.com/ros-controls/ros2_control_demos/actions/workflows/jazzy-semi-binary-build.yml?branch=master) | [Documentation](https://control.ros.org/jazzy/doc/ros2_control_demos/doc/index.html)
 **Humble** | [`humble`](https://github.com/ros-controls/ros2_control_demos/tree/humble) | [![Humble Binary Build](https://github.com/ros-controls/ros2_control_demos/actions/workflows/humble-binary-build.yml/badge.svg?branch=master)](https://github.com/ros-controls/ros2_control_demos/actions/workflows/humble-binary-build.yml?branch=master) <br> [![Humble Semi-Binary Build](https://github.com/ros-controls/ros2_control_demos/actions/workflows/humble-semi-binary-build.yml/badge.svg?branch=master)](https://github.com/ros-controls/ros2_control_demos/actions/workflows/humble-semi-binary-build.yml?branch=master) | [Documentation](https://control.ros.org/humble/doc/ros2_control_demos/doc/index.html)
+
+## Building with MuJoCo (Example 18)
+
+Example 18 uses `mujoco_ros2_control` which requires proper linking of GLFW dependencies. When building `mujoco_ros2_control`, you may encounter undefined symbol errors related to GLFW if static libraries in the dependency chain are not properly linked.
+
+### Static Library Linking Issue
+
+The `mujoco_ros2_control` package includes a static library (`libsimulate`) that contains object files with GLFW function calls. Static libraries do not resolve external symbols at build time - they must be resolved when the static library is linked into the final shared library.
+
+**Library dependency chain:**
+- `platform_ui_adapter` (OBJECT library) → contains GLFW function calls
+- `libsimulate` (STATIC library) → includes `platform_ui_adapter` object files
+- `mujoco_ros2_control` (SHARED library) → links to `libsimulate`
+
+**Solution:** Both `platform_ui_adapter` and `libsimulate` must link to GLFW to ensure the dependency is properly recorded and resolved when `mujoco_ros2_control` links to the static library.
+
+### Platform Compatibility
+
+The CMakeLists.txt in `mujoco_ros2_control` uses a multi-tier approach for GLFW detection that works across platforms:
+
+1. **Primary:** Uses `pkg-config` to find GLFW (works on Linux with system packages)
+2. **Fallback 1:** Uses `find_library` with platform-specific paths (`/usr/lib/x86_64-linux-gnu` for Linux x86_64) and then general search paths
+3. **Fallback 2:** Uses CMake config mode (works in conda/pixi environments)
+4. **Fallback 3:** Manual library search with standard paths
+
+The explicit path `/usr/lib/x86_64-linux-gnu` is Linux x86_64-specific, but the code includes fallbacks:
+- Line 74: General `find_library` without `NO_DEFAULT_PATH` searches standard locations
+- Lines 89-96: CMake config mode handles conda/pixi environments
+- Lines 98-114: Manual find with standard paths works on macOS and other Unix systems
+
+This approach ensures compatibility across Linux (x86_64, ARM64), macOS, and conda/pixi environments. For other platforms, you may need to adjust the search paths or use the CMake config mode.
 
 ## Acknowledgements
 

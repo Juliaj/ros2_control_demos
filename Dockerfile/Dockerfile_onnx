@@ -1,0 +1,57 @@
+ARG ROS_DISTRO=rolling
+
+FROM ros:${ROS_DISTRO}-ros-base
+
+ARG SOURCE_DIR=/home/ros2_ws/src/ros2_control_demos
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && \
+    : "remove cache" && \
+    apt-get autoremove -y -qq && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p ${SOURCE_DIR}
+VOLUME ["${SOURCE_DIR}"]
+
+RUN cd /home/ros2_ws/src \
+    && rosdep update --rosdistro ${ROS_DISTRO}  \
+    # uncomment this line if you want to use the latest version of ros2_control
+    # && vcs import --input https://raw.githubusercontent.com/ros-controls/ros2_control_ci/master/ros_controls.rolling-on-$ROS_DISTRO.repos \
+    && apt-get update \
+    && rosdep install --from-paths ./ -i -y --rosdistro ${ROS_DISTRO} \
+    --skip-keys ros-${ROS_DISTRO}-joint-state-publisher-gui --skip-keys ros-${ROS_DISTRO}-rviz2 \
+    && \
+    : "remove cache" && \
+    apt-get autoremove -y -qq && \
+    rm -rf /var/lib/apt/lists/*
+
+# Handle dependencies for Example 18
+# install onnx runtime
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/onnxruntime-linux-x64-1.23.2.tgz
+RUN tar -xzf onnxruntime-linux-x64-1.23.2.tgz
+RUN sudo cp -r onnxruntime-linux-x64-1.23.2/include/* /usr/local/include/
+RUN sudo cp -r onnxruntime-linux-x64-1.23.2/lib/* /usr/local/lib/
+RUN sudo ldconfig
+
+# install gazebo
+RUN sudo apt-get update
+RUN sudo apt-get install ros-${ROS_DISTRO}-ros-gz
+
+# Add OpenDuckMini urdf and onnx model to example_18 package
+git clone https://github.com/apirrone/Open_Duck_Mini.git
+cd Open_Duck_Mini
+git checkout support_4B_registers
+git pull
+cd ..
+cp -r Open_Duck_Mini/robots/open_duck_mini_v2/scene.xml /home/ros2_ws/src/ros2_control_demos/ros2_control_demo_example_18/urdf/open_duck_mini_v2.xml
+cp -r Open_Duck_Mini/experiments/v2/BEST_WALK_ONNX.onnx /home/ros2_ws/src/ros2_control_demos/ros2_control_demo_example_18/onnx_model/BEST_WALK_ONNX.onnx
+
+
+# Build will happen at runtime via entrypoint when volume is mounted
+# This allows code changes without rebuilding the image
+
+COPY Dockerfile/entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

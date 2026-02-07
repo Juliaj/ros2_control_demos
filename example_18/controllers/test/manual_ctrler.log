@@ -1,0 +1,272 @@
+[INFO] [launch]: All log files can be found below /home/juliajia/.ros/log/2026-01-01-15-17-45-780306-juliajia-ubuntu-19158
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [19162]
+[INFO] [ros2_control_node-2]: process started with pid [19163]
+[INFO] [spawner-3]: process started with pid [19164]
+[INFO] [spawner-4]: process started with pid [19165]
+[INFO] [spawner-5]: process started with pid [19166]
+[robot_state_publisher-1] [INFO] [1767309465.892189625] [robot_state_publisher]: Robot initialized
+[ros2_control_node-2] [INFO] [1767309465.897939250] [controller_manager]: Using ROS clock for triggering controller manager cycles.
+[ros2_control_node-2] [INFO] [1767309465.904526471] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-2] [INFO] [1767309465.905437536] [controller_manager]: update rate is 50 Hz
+[ros2_control_node-2] [INFO] [1767309465.905446777] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-2] [INFO] [1767309465.905449247] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-2] [WARN] [1767309465.905481847] [controller_manager]: Could not enable FIFO RT scheduling policy: with error number <1>(Operation not permitted). See [https://control.ros.org/master/doc/ros2_control/controller_manager/doc/userdoc.html] for details on how to enable realtime scheduling.
+[spawner-4] [INFO] [1767309466.032533061] [spawn_state_interfaces_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-2] [INFO] [1767309466.077787180] [controller_manager]: Received robot description from topic.
+[ros2_control_node-2] [INFO] [1767309466.080588237] [controller_manager]: Loading hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309466.083248864] [controller_manager]: Loaded hardware 'OpenDuckMini' from plugin 'mujoco_ros2_control/MujocoSystemInterface'
+[ros2_control_node-2] [INFO] [1767309466.083501425] [controller_manager]: Initialize hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309466.086009321] [controller_manager.hardware_component.system.OpenDuckMini]: `status_publish_rate` is set to 0.0, hardware status publisher will not be created.
+[ros2_control_node-2] [INFO] [1767309466.086194172] [MujocoSystemInterface]: Loading 'mujoco_model' from: /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/description/mujoco/scene.xml
+[ros2_control_node-2] [INFO] [1767309466.086204022] [MujocoSystemInterface]: No sim_speed set, using the setting from the UI
+[ros2_control_node-2] [INFO] [1767309466.248665774] [MujocoSystemInterface]: Starting the mujoco rendering thread...
+[ros2_control_node-2] [INFO] [1767309466.446990818] [MujocoSystemInterface]: Loaded initial positions from file /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/description/mujoco/start_positions.xml.
+[ros2_control_node-2] [INFO] [1767309466.447055958] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'left_hip_yaw'
+[ros2_control_node-2] [INFO] [1767309466.447066548] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'left_hip_roll'
+[ros2_control_node-2] [INFO] [1767309466.447070278] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'left_hip_pitch'
+[ros2_control_node-2] [INFO] [1767309466.447073839] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'left_knee'
+[ros2_control_node-2] [INFO] [1767309466.447077089] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'left_ankle'
+[ros2_control_node-2] [INFO] [1767309466.447080539] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'neck_pitch'
+[ros2_control_node-2] [INFO] [1767309466.447083829] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'head_pitch'
+[ros2_control_node-2] [INFO] [1767309466.447087169] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'head_yaw'
+[ros2_control_node-2] [INFO] [1767309466.447090269] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'head_roll'
+[ros2_control_node-2] [INFO] [1767309466.447094159] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'right_hip_yaw'
+[ros2_control_node-2] [INFO] [1767309466.447097459] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'right_hip_roll'
+[ros2_control_node-2] [INFO] [1767309466.447100659] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'right_hip_pitch'
+[ros2_control_node-2] [INFO] [1767309466.447104149] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'right_knee'
+[ros2_control_node-2] [INFO] [1767309466.447108329] [MujocoSystemInterface]: Using MuJoCo position actuator for the joint : 'right_ankle'
+[ros2_control_node-2] [INFO] [1767309466.447121559] [MujocoSystemInterface]: Adding sensor named: imu, of type: imu, mapping to the MJCF sensor: imu
+[ros2_control_node-2] [INFO] [1767309466.447190099] [MujocoSystemInterface]: Adding sensor named: velocimeter, of type: velocimeter, mapping to the MJCF sensor: local_linvel
+[ros2_control_node-2] [INFO] [1767309466.447196729] [MujocoSystemInterface]: Registered velocimeter sensor 'velocimeter' mapping to MJCF sensor: local_linvel
+[ros2_control_node-2] [INFO] [1767309466.447199879] [MujocoSystemInterface]: Adding sensor named: left_foot_contact, of type: contact, mapping to the MJCF sensor: left_foot_contact
+[ros2_control_node-2] [INFO] [1767309466.447232379] [MujocoSystemInterface]: Contact sensor 'left_foot_contact': body1_id=7 (foot_assembly), body2_id=17 (floor)
+[ros2_control_node-2] [INFO] [1767309466.447236430] [MujocoSystemInterface]:   Geom 'unknown' (id=16) belongs to body_id=7
+[ros2_control_node-2] [INFO] [1767309466.447237880] [MujocoSystemInterface]:   Geom 'unknown' (id=17) belongs to body_id=7
+[ros2_control_node-2] [INFO] [1767309466.447239280] [MujocoSystemInterface]:   Geom 'left_foot_bottom_tpu' (id=18) belongs to body_id=7
+[ros2_control_node-2] [INFO] [1767309466.447240720] [MujocoSystemInterface]:   Geom 'unknown' (id=19) belongs to body_id=7
+[ros2_control_node-2] [INFO] [1767309466.447241970] [MujocoSystemInterface]:   Geom 'unknown' (id=20) belongs to body_id=7
+[ros2_control_node-2] [INFO] [1767309466.447243480] [MujocoSystemInterface]:   Geom 'floor' (id=46) belongs to body_id=17
+[ros2_control_node-2] [INFO] [1767309466.447247630] [MujocoSystemInterface]: Registered contact sensor 'left_foot_contact' checking contact between 'foot_assembly' and 'floor'
+[ros2_control_node-2] [INFO] [1767309466.447252450] [MujocoSystemInterface]: Adding sensor named: right_foot_contact, of type: contact, mapping to the MJCF sensor: right_foot_contact
+[ros2_control_node-2] [INFO] [1767309466.447255530] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16 (foot_assembly_2), body2_id=17 (floor)
+[ros2_control_node-2] [INFO] [1767309466.447257410] [MujocoSystemInterface]:   Geom 'unknown' (id=41) belongs to body_id=16
+[ros2_control_node-2] [INFO] [1767309466.447258660] [MujocoSystemInterface]:   Geom 'unknown' (id=42) belongs to body_id=16
+[ros2_control_node-2] [INFO] [1767309466.447259970] [MujocoSystemInterface]:   Geom 'right_foot_bottom_tpu' (id=43) belongs to body_id=16
+[ros2_control_node-2] [INFO] [1767309466.447261360] [MujocoSystemInterface]:   Geom 'unknown' (id=44) belongs to body_id=16
+[ros2_control_node-2] [INFO] [1767309466.447262680] [MujocoSystemInterface]:   Geom 'unknown' (id=45) belongs to body_id=16
+[ros2_control_node-2] [INFO] [1767309466.447263990] [MujocoSystemInterface]:   Geom 'floor' (id=46) belongs to body_id=17
+[ros2_control_node-2] [INFO] [1767309466.447265610] [MujocoSystemInterface]: Registered contact sensor 'right_foot_contact' checking contact between 'foot_assembly_2' and 'floor'
+[ros2_control_node-2] [INFO] [1767309466.448509187] [MujocoSystemInterface]: Initializing cameras...
+[ros2_control_node-2] [INFO] [1767309466.448524767] [MujocoSystemInterface]: Initializing lidar...
+[ros2_control_node-2] [INFO] [1767309466.448599158] [MujocoSystemInterface]: Starting the mujoco physics thread...
+[ros2_control_node-2] [INFO] [1767309466.448664368] [controller_manager]: Successful initialization of hardware 'OpenDuckMini'
+[ros2_control_node-2] [INFO] [1767309466.449671355] [resource_manager]: 'configure' hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309466.449695975] [resource_manager]: Successful 'configure' of hardware 'OpenDuckMini'
+[ros2_control_node-2] [INFO] [1767309466.449737355] [resource_manager]: 'activate' hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309466.449754675] [MujocoSystemInterface]: Activating MuJoCo hardware interface and starting Simulate threads...
+[ros2_control_node-2] [INFO] [1767309466.449825056] [resource_manager]: Successful 'activate' of hardware 'OpenDuckMini'
+[ros2_control_node-2] [INFO] [1767309466.449849366] [mujoco_node]: Starting the lidar processing loop, publishing at 5 Hz
+[ros2_control_node-2] [INFO] [1767309466.450000567] [controller_manager]: Registering statistics for : OpenDuckMini
+[ros2_control_node-2] [INFO] [1767309466.450095047] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-2] [INFO] [1767309466.533854124] [controller_manager]: Loading controller : 'state_interfaces_broadcaster' of type 'state_interfaces_broadcaster/StateInterfacesBroadcaster'
+[ros2_control_node-2] [INFO] [1767309466.533870714] [controller_manager]: Loading controller 'state_interfaces_broadcaster'
+[ros2_control_node-2] [INFO] [1767309466.534677589] [controller_manager]: Controller 'state_interfaces_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_sg49keum --params-file /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/config/open_duck_mini_controllers_data_collection.yaml --param use_sim_time:=true 
+[spawner-4] [INFO] [1767309466.538396482] [spawn_state_interfaces_broadcaster]: Loaded state_interfaces_broadcaster
+[ros2_control_node-2] [INFO] [1767309466.538891085] [controller_manager]: Configuring controller: 'state_interfaces_broadcaster'
+[ros2_control_node-2] [INFO] [1767309466.542786169] [controller_manager]: Activating controllers: [ state_interfaces_broadcaster ]
+[ros2_control_node-2] [INFO] [1767309466.542988210] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-2] [INFO] [1767309466.543161041] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-2] [INFO] [1767309466.595665825] [mujoco_node]: Initializing rendering for cameras
+[ros2_control_node-2] [INFO] [1767309466.595787196] [mujoco_node]: Starting the camera rendering loop, publishing at 5.000000 Hz
+[ros2_control_node-2] [INFO] [1767309466.624514893] [mujoco_node]: Resized offscreen buffer to 1 x 1
+[spawner-4] [INFO] [1767309466.669634332] [spawn_state_interfaces_broadcaster]: Configured and activated state_interfaces_broadcaster
+[spawner-5] [INFO] [1767309466.735606579] [spawn_forward_command_controller]: waiting for service /controller_manager/list_controllers to become available...
+[INFO] [spawner-4]: process has finished cleanly [pid 19165]
+[ros2_control_node-2] [INFO] [1767309467.066897043] [controller_manager]: Loading controller : 'forward_command_controller' of type 'forward_command_controller/ForwardCommandController'
+[ros2_control_node-2] [INFO] [1767309467.066927813] [controller_manager]: Loading controller 'forward_command_controller'
+[ros2_control_node-2] [INFO] [1767309467.068331012] [controller_manager]: Controller 'forward_command_controller' node arguments: --ros-args --params-file /tmp/launch_params_sg49keum --params-file /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/config/open_duck_mini_controllers_data_collection.yaml --param use_sim_time:=true 
+[spawner-5] [INFO] [1767309467.087625511] [spawn_forward_command_controller]: Loaded forward_command_controller
+[ros2_control_node-2] [INFO] [1767309467.168400789] [controller_manager]: Configuring controller: 'forward_command_controller'
+[ros2_control_node-2] [INFO] [1767309467.169345255] [forward_command_controller]: configure successful
+[ros2_control_node-2] [INFO] [1767309467.188092281] [controller_manager]: Activating controllers: [ forward_command_controller ]
+[ros2_control_node-2] [INFO] [1767309467.188392323] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-2] [INFO] [1767309467.188425243] [MujocoSystemInterface]: Joint left_hip_yaw: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188430323] [MujocoSystemInterface]: Joint left_hip_roll: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188433063] [MujocoSystemInterface]: Joint left_hip_pitch: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188435563] [MujocoSystemInterface]: Joint left_knee: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188437253] [MujocoSystemInterface]: Joint left_ankle: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188438943] [MujocoSystemInterface]: Joint neck_pitch: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188440563] [MujocoSystemInterface]: Joint head_pitch: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188442123] [MujocoSystemInterface]: Joint head_yaw: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188443753] [MujocoSystemInterface]: Joint head_roll: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188445393] [MujocoSystemInterface]: Joint right_hip_yaw: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188447373] [MujocoSystemInterface]: Joint right_hip_roll: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188449283] [MujocoSystemInterface]: Joint right_hip_pitch: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188452903] [MujocoSystemInterface]: Joint right_knee: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188454853] [MujocoSystemInterface]: Joint right_ankle: position control enabled (velocity, effort disabled)
+[ros2_control_node-2] [INFO] [1767309467.188628724] [forward_command_controller]: activate successful
+[ros2_control_node-2] [INFO] [1767309467.188650714] [controller_manager]: Successfully switched controllers!
+[spawner-5] [INFO] [1767309467.207174329] [spawn_forward_command_controller]: Configured and activated forward_command_controller
+[spawner-3] [INFO] [1767309467.293704192] [spawn_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[INFO] [spawner-5]: process has finished cleanly [pid 19166]
+[ros2_control_node-2] [INFO] [1767309467.625471509] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-2] [INFO] [1767309467.625487660] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1767309467.627658443] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_sg49keum --params-file /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/config/open_duck_mini_controllers_data_collection.yaml --param use_sim_time:=true 
+[ros2_control_node-2] [INFO] [1767309467.628910781] [MujocoSystemInterface]: Floating base position: x=-0.0067, y=0.0002, z=0.1612 | time=1.00
+[spawner-3] [INFO] [1767309467.648215050] [spawn_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-2] [INFO] [1767309467.648731863] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1767309467.648799863] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-2] [INFO] [1767309467.667309568] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-2] [INFO] [1767309467.667435008] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-2] [INFO] [1767309467.668197133] [controller_manager]: Successfully switched controllers!
+[spawner-3] [INFO] [1767309467.687485832] [spawn_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-3]: process has finished cleanly [pid 19164]
+[ros2_control_node-2] [INFO] [1767309468.628914131] [MujocoSystemInterface]: Floating base position: x=-0.0066, y=0.0002, z=0.1608 | time=2.00
+[ros2_control_node-2] [INFO] [1767309469.630584701] [MujocoSystemInterface]: Floating base position: x=-0.0065, y=0.0002, z=0.1605 | time=3.00
+[ros2_control_node-2] [INFO] [1767309470.630453809] [MujocoSystemInterface]: Floating base position: x=-0.0064, y=0.0002, z=0.1604 | time=4.00
+[ros2_control_node-2] [INFO] [1767309471.631183613] [MujocoSystemInterface]: Floating base position: x=-0.0064, y=0.0002, z=0.1602 | time=5.00
+[ros2_control_node-2] [INFO] [1767309472.631198952] [MujocoSystemInterface]: Floating base position: x=-0.0063, y=0.0002, z=0.1601 | time=6.00
+[ros2_control_node-2] [INFO] [1767309473.630537617] [MujocoSystemInterface]: Floating base position: x=-0.0063, y=0.0002, z=0.1601 | time=7.00
+[ros2_control_node-2] [INFO] [1767309474.631040478] [MujocoSystemInterface]: Floating base position: x=-0.0063, y=0.0002, z=0.1600 | time=8.00
+[ros2_control_node-2] [INFO] [1767309475.631316328] [MujocoSystemInterface]: Floating base position: x=-0.0063, y=0.0002, z=0.1600 | time=9.00
+[ros2_control_node-2] [INFO] [1767309476.631084874] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=10.00
+[ros2_control_node-2] [INFO] [1767309476.712405996] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309477.631177453] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=11.00
+[ros2_control_node-2] [INFO] [1767309478.631051730] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=12.00
+[ros2_control_node-2] [INFO] [1767309479.630499643] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=13.00
+[ros2_control_node-2] [INFO] [1767309480.630580011] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=14.00
+[ros2_control_node-2] [INFO] [1767309481.630705518] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=15.00
+[ros2_control_node-2] [INFO] [1767309482.630413853] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1599 | time=16.00
+[ros2_control_node-2] [INFO] [1767309483.630459550] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=17.00
+[ros2_control_node-2] [INFO] [1767309484.630539426] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=18.00
+[ros2_control_node-2] [INFO] [1767309485.630689263] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=19.00
+[ros2_control_node-2] [INFO] [1767309486.632532680] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=20.01
+[ros2_control_node-2] [INFO] [1767309486.780857884] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309487.633189549] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=21.01
+[ros2_control_node-2] [INFO] [1767309488.633323525] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=22.01
+[ros2_control_node-2] [INFO] [1767309489.632844277] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=23.01
+[ros2_control_node-2] [INFO] [1767309490.632894992] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=24.01
+[ros2_control_node-2] [INFO] [1767309491.632564604] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=25.01
+[ros2_control_node-2] [INFO] [1767309492.633315223] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=26.01
+[ros2_control_node-2] [INFO] [1767309493.632365181] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=27.01
+[ros2_control_node-2] [INFO] [1767309494.632591316] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=28.01
+[ros2_control_node-2] [INFO] [1767309495.632332528] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=29.01
+[ros2_control_node-2] [INFO] [1767309496.632635723] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=30.01
+[ros2_control_node-2] [INFO] [1767309496.798669056] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309497.632998478] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=31.01
+[ros2_control_node-2] [INFO] [1767309498.632569418] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=32.01
+[ros2_control_node-2] [INFO] [1767309499.632709541] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=33.01
+[ros2_control_node-2] [INFO] [1767309500.633007245] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=34.01
+[ros2_control_node-2] [INFO] [1767309501.632556804] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=35.01
+[ros2_control_node-2] [INFO] [1767309502.632440055] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=36.01
+[ros2_control_node-2] [INFO] [1767309503.632500177] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=37.01
+[ros2_control_node-2] [INFO] [1767309504.632902691] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=38.01
+[ros2_control_node-2] [INFO] [1767309505.632704521] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=39.01
+[ros2_control_node-2] [INFO] [1767309506.632706682] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=40.01
+[ros2_control_node-2] [INFO] [1767309506.799368688] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309507.632857593] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=41.01
+[ros2_control_node-2] [INFO] [1767309508.632865584] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=42.01
+[ros2_control_node-2] [INFO] [1767309509.632733383] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=43.01
+[ros2_control_node-2] [INFO] [1767309510.633192176] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=44.01
+[ros2_control_node-2] [INFO] [1767309511.632499501] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=45.01
+[ros2_control_node-2] [INFO] [1767309512.633166505] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=46.01
+[ros2_control_node-2] [INFO] [1767309513.632488500] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=47.01
+[ros2_control_node-2] [INFO] [1767309514.632682170] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=48.01
+[ros2_control_node-2] [INFO] [1767309515.632540138] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=49.01
+[ros2_control_node-2] [INFO] [1767309516.632639337] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=50.01
+[ros2_control_node-2] [INFO] [1767309516.798452498] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309517.632723386] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=51.01
+[ros2_control_node-2] [INFO] [1767309518.633306117] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=52.01
+[ros2_control_node-2] [INFO] [1767309519.633227075] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=53.01
+[ros2_control_node-2] [INFO] [1767309520.632298167] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=54.01
+[ros2_control_node-2] [INFO] [1767309521.632553906] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=55.01
+[ros2_control_node-2] [INFO] [1767309522.632704614] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=56.01
+[ros2_control_node-2] [INFO] [1767309523.633065313] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=57.01
+[ros2_control_node-2] [INFO] [1767309524.632758618] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1598 | time=58.01
+[ros2_control_node-2] [INFO] [1767309525.632924075] [MujocoSystemInterface]: Floating base position: x=-0.0062, y=0.0002, z=0.1594 | time=59.01
+[ros2_control_node-2] [INFO] [1767309526.632496489] [MujocoSystemInterface]: Floating base position: x=-0.0030, y=0.0002, z=0.1551 | time=60.01
+[ros2_control_node-2] [INFO] [1767309526.798398390] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309527.632305504] [MujocoSystemInterface]: Floating base position: x=0.0041, y=0.0009, z=0.1529 | time=61.01
+[ros2_control_node-2] [INFO] [1767309528.633170535] [MujocoSystemInterface]: Floating base position: x=0.0088, y=0.0007, z=0.1518 | time=62.01
+[ros2_control_node-2] [INFO] [1767309529.632908749] [MujocoSystemInterface]: Floating base position: x=0.0086, y=-0.0064, z=0.1538 | time=63.01
+[ros2_control_node-2] [INFO] [1767309530.632840224] [MujocoSystemInterface]: Floating base position: x=0.0168, y=0.0060, z=0.1581 | time=64.01
+[ros2_control_node-2] [INFO] [1767309531.632977300] [MujocoSystemInterface]: Floating base position: x=0.0168, y=0.0080, z=0.1598 | time=65.01
+[ros2_control_node-2] [INFO] [1767309532.632479772] [MujocoSystemInterface]: Floating base position: x=0.0168, y=0.0084, z=0.1602 | time=66.01
+[ros2_control_node-2] [INFO] [1767309533.632467887] [MujocoSystemInterface]: Floating base position: x=0.0169, y=0.0085, z=0.1603 | time=67.01
+[ros2_control_node-2] [INFO] [1767309534.632902164] [MujocoSystemInterface]: Floating base position: x=0.0170, y=0.0085, z=0.1604 | time=68.01
+[ros2_control_node-2] [INFO] [1767309535.633221190] [MujocoSystemInterface]: Floating base position: x=0.0171, y=0.0085, z=0.1604 | time=69.01
+[ros2_control_node-2] [INFO] [1767309536.633187944] [MujocoSystemInterface]: Floating base position: x=0.0173, y=0.0084, z=0.1603 | time=70.01
+[ros2_control_node-2] [INFO] [1767309536.799021085] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=6, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309537.632581584] [MujocoSystemInterface]: Floating base position: x=0.0175, y=0.0083, z=0.1602 | time=71.01
+[ros2_control_node-2] [INFO] [1767309538.632563838] [MujocoSystemInterface]: Floating base position: x=0.0180, y=0.0080, z=0.1595 | time=72.01
+[ros2_control_node-2] [INFO] [1767309539.632804762] [MujocoSystemInterface]: Floating base position: x=0.0193, y=0.0069, z=0.1581 | time=73.01
+[ros2_control_node-2] [INFO] [1767309540.632784606] [MujocoSystemInterface]: Floating base position: x=0.0194, y=-0.0134, z=0.1546 | time=74.01
+[ros2_control_node-2] [INFO] [1767309541.632673878] [MujocoSystemInterface]: Floating base position: x=0.0203, y=-0.0121, z=0.1524 | time=75.01
+[ros2_control_node-2] [INFO] [1767309542.633032053] [MujocoSystemInterface]: Floating base position: x=0.0278, y=-0.0140, z=0.1516 | time=76.01
+[ros2_control_node-2] [INFO] [1767309543.632896365] [MujocoSystemInterface]: Floating base position: x=0.0304, y=-0.0092, z=0.1521 | time=77.01
+[ros2_control_node-2] [INFO] [1767309544.634918769] [MujocoSystemInterface]: Floating base position: x=0.0430, y=0.0010, z=0.1501 | time=78.01
+[ros2_control_node-2] [INFO] [1767309545.635161913] [MujocoSystemInterface]: Floating base position: x=0.0493, y=0.0090, z=0.1504 | time=79.01
+[ros2_control_node-2] [INFO] [1767309546.634786003] [MujocoSystemInterface]: Floating base position: x=0.0566, y=0.0170, z=0.1500 | time=80.01
+[ros2_control_node-2] [INFO] [1767309546.800895935] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=4, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309547.634574593] [MujocoSystemInterface]: Floating base position: x=0.0867, y=0.0244, z=0.1490 | time=81.01
+[ros2_control_node-2] [INFO] [1767309548.634664605] [MujocoSystemInterface]: Floating base position: x=0.1096, y=0.0313, z=0.1492 | time=82.01
+[ros2_control_node-2] [INFO] [1767309549.634537216] [MujocoSystemInterface]: Floating base position: x=0.1526, y=0.0339, z=0.1492 | time=83.01
+[ros2_control_node-2] [INFO] [1767309550.635085400] [MujocoSystemInterface]: Floating base position: x=0.2004, y=0.0233, z=0.1495 | time=84.01
+[ros2_control_node-2] [INFO] [1767309551.635314813] [MujocoSystemInterface]: Floating base position: x=0.2462, y=0.0080, z=0.1499 | time=85.01
+[ros2_control_node-2] [INFO] [1767309552.634888791] [MujocoSystemInterface]: Floating base position: x=0.2909, y=-0.0158, z=0.1495 | time=86.01
+[ros2_control_node-2] [INFO] [1767309553.634587259] [MujocoSystemInterface]: Floating base position: x=0.3313, y=-0.0481, z=0.1495 | time=87.01
+[ros2_control_node-2] [INFO] [1767309554.634291668] [MujocoSystemInterface]: Floating base position: x=0.3704, y=-0.0805, z=0.1493 | time=88.01
+[ros2_control_node-2] [INFO] [1767309555.635109233] [MujocoSystemInterface]: Floating base position: x=0.4035, y=-0.1170, z=0.1496 | time=89.01
+[ros2_control_node-2] [INFO] [1767309556.634420768] [MujocoSystemInterface]: Floating base position: x=0.4298, y=-0.1547, z=0.1498 | time=90.01
+[ros2_control_node-2] [INFO] [1767309556.800921072] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=4, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309557.635318283] [MujocoSystemInterface]: Floating base position: x=0.4517, y=-0.1932, z=0.1494 | time=91.01
+[ros2_control_node-2] [INFO] [1767309558.634918931] [MujocoSystemInterface]: Floating base position: x=0.4658, y=-0.2353, z=0.1496 | time=92.01
+[ros2_control_node-2] [INFO] [1767309559.635098801] [MujocoSystemInterface]: Floating base position: x=0.4722, y=-0.2817, z=0.1497 | time=93.01
+[ros2_control_node-2] [INFO] [1767309560.634701297] [MujocoSystemInterface]: Floating base position: x=0.4700, y=-0.3282, z=0.1483 | time=94.01
+[ros2_control_node-2] [INFO] [1767309561.635082008] [MujocoSystemInterface]: Floating base position: x=0.4595, y=-0.3759, z=0.1493 | time=95.01
+[ros2_control_node-2] [INFO] [1767309562.635215628] [MujocoSystemInterface]: Floating base position: x=0.4410, y=-0.4223, z=0.1495 | time=96.01
+[ros2_control_node-2] [INFO] [1767309563.635152086] [MujocoSystemInterface]: Floating base position: x=0.4175, y=-0.4654, z=0.1484 | time=97.01
+[ros2_control_node-2] [INFO] [1767309564.634898332] [MujocoSystemInterface]: Floating base position: x=0.3862, y=-0.5074, z=0.1494 | time=98.01
+[ros2_control_node-2] [INFO] [1767309565.634375397] [MujocoSystemInterface]: Floating base position: x=0.3517, y=-0.5442, z=0.1497 | time=99.01
+[ros2_control_node-2] [INFO] [1767309566.634816938] [MujocoSystemInterface]: Floating base position: x=0.3152, y=-0.5736, z=0.1492 | time=100.01
+[ros2_control_node-2] [INFO] [1767309566.801198980] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=4, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309567.634278642] [MujocoSystemInterface]: Floating base position: x=0.2746, y=-0.5992, z=0.1498 | time=101.01
+[ros2_control_node-2] [INFO] [1767309568.634664632] [MujocoSystemInterface]: Floating base position: x=0.2357, y=-0.6175, z=0.1491 | time=102.01
+[ros2_control_node-2] [INFO] [1767309569.634613528] [MujocoSystemInterface]: Floating base position: x=0.1941, y=-0.6302, z=0.1493 | time=103.01
+[ros2_control_node-2] [INFO] [1767309570.634550215] [MujocoSystemInterface]: Floating base position: x=0.1496, y=-0.6401, z=0.1498 | time=104.01
+[ros2_control_node-2] [INFO] [1767309571.634367400] [MujocoSystemInterface]: Floating base position: x=0.0995, y=-0.6409, z=0.1493 | time=105.01
+[ros2_control_node-2] [INFO] [1767309572.634856180] [MujocoSystemInterface]: Floating base position: x=0.0468, y=-0.6406, z=0.1491 | time=106.01
+[ros2_control_node-2] [INFO] [1767309573.634455354] [MujocoSystemInterface]: Floating base position: x=-0.0045, y=-0.6361, z=0.1496 | time=107.01
+[ros2_control_node-2] [INFO] [1767309574.634435040] [MujocoSystemInterface]: Floating base position: x=-0.0505, y=-0.6258, z=0.1485 | time=108.01
+[ros2_control_node-2] [INFO] [1767309575.635126750] [MujocoSystemInterface]: Floating base position: x=-0.0981, y=-0.6101, z=0.1498 | time=109.01
+[ros2_control_node-2] [INFO] [1767309576.634516792] [MujocoSystemInterface]: Floating base position: x=-0.1432, y=-0.5855, z=0.1495 | time=110.01
+[ros2_control_node-2] [INFO] [1767309576.800701593] [MujocoSystemInterface]: Contact sensor 'right_foot_contact': body1_id=16, body2_id=17, ncon=4, in_contact=YES
+[ros2_control_node-2] [INFO] [1767309577.634677769] [MujocoSystemInterface]: Floating base position: x=-0.1859, y=-0.5590, z=0.1490 | time=111.01
+[ros2_control_node-2] [INFO] [1767309578.634485073] [MujocoSystemInterface]: Floating base position: x=-0.2249, y=-0.5275, z=0.1500 | time=112.01
+[ros2_control_node-2] [INFO] [1767309579.635152392] [MujocoSystemInterface]: Floating base position: x=-0.2599, y=-0.4897, z=0.1496 | time=113.01
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[robot_state_publisher-1] [INFO] [1767309580.016553836] [rclcpp]: signal_handler(signum=2)
+[ros2_control_node-2] [INFO] [1767309580.016571466] [rclcpp]: signal_handler(signum=2)
+[ros2_control_node-2] [INFO] [1767309580.016663366] [controller_manager]: Shutdown request received....
+[ros2_control_node-2] [INFO] [1767309580.016709537] [controller_manager]: Shutting down all controllers in the controller manager.
+[ros2_control_node-2] [INFO] [1767309580.016743747] [controller_manager]: Deactivating controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1767309580.016963328] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1767309580.017072019] [controller_manager]: Deactivating controller 'forward_command_controller'
+[ros2_control_node-2] [INFO] [1767309580.017188439] [controller_manager]: Shutting down controller 'forward_command_controller'
+[ros2_control_node-2] [INFO] [1767309580.017225670] [controller_manager]: Deactivating controller 'state_interfaces_broadcaster'
+[ros2_control_node-2] [INFO] [1767309580.017246120] [controller_manager]: Shutting down controller 'state_interfaces_broadcaster'
+[ros2_control_node-2] [INFO] [1767309580.017284180] [resource_manager]: 'deactivate' hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309580.017293770] [MujocoSystemInterface]: Deactivating MuJoCo hardware interface and shutting down Simulate...
+[ros2_control_node-2] [INFO] [1767309580.017297280] [resource_manager]: Successful 'deactivate' of hardware 'OpenDuckMini'
+[ros2_control_node-2] [INFO] [1767309580.017300580] [resource_manager]: 'shutdown' hardware 'OpenDuckMini' 
+[ros2_control_node-2] [INFO] [1767309580.017303320] [resource_manager]: Successful 'shutdown' of hardware 'OpenDuckMini'
+[ros2_control_node-2] [INFO] [1767309580.017382771] [controller_manager]: Shutting down the controller manager.
+[ros2_control_node-2] [ERROR] [1767309580.017464101] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[ros2_control_node-2] [ERROR] [1767309580.017464121] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[ros2_control_node-2] [INFO] [1767309580.018764969] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-2] [INFO] [1767309580.018773839] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[ros2_control_node-2] [INFO] [1767309580.019320173] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-2] [INFO] [1767309580.019324333] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 19162]
+[ERROR] [ros2_control_node-2]: process has died [pid 19163, exit code -11, cmd '/home/juliajia/ros2_ws/install/mujoco_ros2_control/lib/mujoco_ros2_control/ros2_control_node --ros-args --params-file /tmp/launch_params_sg49keum --params-file /home/juliajia/ros2_ws/install/ros2_control_demo_example_18/share/ros2_control_demo_example_18/config/open_duck_mini_controllers_data_collection.yaml'].
