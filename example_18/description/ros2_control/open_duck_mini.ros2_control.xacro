@@ -22,7 +22,7 @@
     <ros2_control name="${name}" type="system">
       <xacro:unless value="${use_mock_hardware}">
         <hardware>
-          <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
+          <plugin>ros2_control_demo_example_18/DuckMiniMujocoSystemInterface</plugin>
           <param name="mujoco_model">$(find ros2_control_demo_example_18)/description/mujoco/scene.xml</param>
           <param name="meshdir">$(find ros2_control_demo_example_18)/description/assets</param>
           <!-- DISABLED: Using MuJoCo's built-in position actuators (kp=13.37) instead of external PID -->
@@ -201,7 +201,9 @@
         <state_interface name="linear_acceleration.z"/>
       </sensor>
 
-      <!-- Contact sensors - MuJoCo collision detection -->
+      <!-- Contact detection - MuJoCo collision detection -->
+      <!-- Note: Contact detection is not a MuJoCo sensor - it reads from mjData->contact[] (collision detection) -->
+      <!-- However, ROS2 control requires state interfaces to be declared in the <sensor> section -->
       <!-- Reference: Python mujoco_infer_base.py get_feet_contacts() (lines 280-283) -->
       <!-- Checks collisions between foot bodies and floor using mj_data_->contact[] array -->
       <!-- Matches Python reference: check_contact(data, "foot_assembly", "floor") -->

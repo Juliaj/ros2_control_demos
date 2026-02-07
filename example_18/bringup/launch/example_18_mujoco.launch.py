@@ -32,6 +32,7 @@ def generate_launch_description():
     # NOTE: URDF is loaded ONLY for robot_state_publisher to compute TF transforms.
     # The actual robot model for simulation is loaded by MuJoCo from scene.xml via
     # the mujoco_model parameter in ros2_control xacro (open_duck_mini.ros2_control.xacro).
+    # The hardware plugin (DuckMiniMujocoSystemInterface) is also defined in the xacro.
     # This URDF should be minimal - containing only kinematic structure (links/joints)
     # needed for TF tree computation, not the full robot description.
     robot_description_content = Command(

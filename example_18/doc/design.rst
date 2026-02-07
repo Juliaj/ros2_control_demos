@@ -206,6 +206,11 @@ Hardware Layer
 - Exposes state interfaces for IMU sensor and joint states
 - Accepts command interfaces for joint positions
 
+DuckMiniMujocoSystemInterface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``DuckMiniMujocoSystemInterface`` extends ``mujoco_ros2_control::MujocoSystemInterface`` to add foot contact detection for gait control. It reads collisions from MuJoCo's ``mjData->contact[]`` array and exports two state interfaces per sensor: ``contact_raw`` (unfiltered) and ``contact`` (debounced in GAIT mode). Contact sensors are configured in the ros2_control xacro with ``mujoco_type="contact"``, ``body1_name``, ``body2_name``, and optional ``contact_consumer`` ("collision" or "gait") and debounce parameters.
+
 MuJoCo Model Selection
 -----------------------
 

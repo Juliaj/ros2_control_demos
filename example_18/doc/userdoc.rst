@@ -14,7 +14,7 @@ Prerequisites
 Dependencies
 ^^^^^^^^^^^^
 
-This demo requires `mujoco_ros2_control <https://github.com/ros-controls/mujoco_ros2_control>`_ with contact sensor support. The contact sensor functionality is provided by `PR #69: support contact sensor <https://github.com/ros-controls/mujoco_ros2_control/pull/69>`_.
+This demo requires `mujoco_ros2_control <https://github.com/ros-controls/mujoco_ros2_control>`_ and uses a custom hardware interface (``DuckMiniMujocoSystemInterface``) that extends the base MuJoCo interface to add foot contact detection.
 
 Follow the installation instructions from the mujoco_ros2_control repository to set up the MuJoCo simulation environment.
 
@@ -123,7 +123,7 @@ The demo supports two controller modes. Each mode has its own launch command and
       # Check that controllers are running:
       ros2 control list_controllers
 
-   Send commands using the ONNX inference script which needs to be run under Open_Duck_Playground environment. First, clone the Open_Duck_Playground repository with the required branch:
+   Send commands using the ONNX inference script. First, clone the Open_Duck_Playground repository:
 
    .. code-block:: bash
 
@@ -134,7 +134,7 @@ The demo supports two controller modes. Each mode has its own launch command and
    .. code-block:: bash
 
       cd ~/dev/Open_Duck_Playground
-   
-      uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/bringup/launch/onnx_infer_ros2.py --onnx-model /update_me/example_18/onnx_model/2025_12_26_165635_300482560.onnx
+      uv run python3 ~/ros2_ws/src/ros-controls/ros2_control_demos/example_18/bringup/launch/onnx_infer_ros2.py \
+        --onnx-model $(ros2 pkg prefix ros2_control_demo_example_18)/share/ros2_control_demo_example_18/onnx_model/2025_12_26_165635_300482560.onnx
 
-   The script uses ONNX model inference to generate joint actions based on observations. It allows manual keyboard control of velocity commands and publishes joint position commands to the forward_command_controller. Press 'O' to enable ONNX model control, and use arrow keys or WASD to adjust velocity commands.
+   The script uses ONNX model inference to generate joint actions. Press 'O' to enable ONNX control, and use arrow keys or WASD to adjust velocity commands.

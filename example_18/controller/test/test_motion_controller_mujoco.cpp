@@ -16,13 +16,13 @@
 
 #include <gtest/gtest.h>
 
+#include <mujoco/mujoco.h>
+
 #include <chrono>
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <mujoco/mujoco.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

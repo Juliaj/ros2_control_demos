@@ -27,7 +27,7 @@ This script:
 Usage:
     # Launch MuJoCo simulation with forward command controller
     ros2 launch ros2_control_demo_example_18 example_18_mujoco.launch.py controller_name:=forward_command_controller
-    
+
     # Run this script to send commands
     python3 onnx_infer_ros2.py --onnx-model path/to/model.onnx
 """
@@ -67,6 +67,7 @@ for path in possible_playground_paths:
         sys.path.insert(0, str(path))
         try:
             from playground.common.onnx_infer import OnnxInfer
+
             break
         except ImportError:
             pass
@@ -81,9 +82,9 @@ class OnnxInferROS2(Node):
 
     # Velocity command limits
     VELOCITY_LIMITS = {
-        'lin_x': (-0.15, 0.15),
-        'lin_y': (-0.2, 0.2),
-        'ang_z': (-1.0, 1.0),
+        "lin_x": (-0.15, 0.15),
+        "lin_y": (-0.2, 0.2),
+        "ang_z": (-1.0, 1.0),
     }
     VELOCITY_STEP = 0.01
     ANGULAR_VELOCITY_STEP = 0.05
@@ -105,7 +106,8 @@ class OnnxInferROS2(Node):
     RESET_PUBLISH_DELAY = 0.01
 
     def __init__(self, onnx_model_path, num_joints=14):
-        """Initialize manual control collector.
+        """
+        Initialize manual control collector.
 
         Parameters
         ----------
@@ -113,8 +115,9 @@ class OnnxInferROS2(Node):
             Path to ONNX model file
         num_joints : int
             Number of joints (default: 14 for open_duck_mini_v2)
+
         """
-        super().__init__('onnx_infer_ros2')
+        super().__init__("onnx_infer_ros2")
         self.num_joints = num_joints
 
         # Load ONNX model
@@ -127,27 +130,29 @@ class OnnxInferROS2(Node):
         self.max_motor_velocity = self.MAX_MOTOR_VELOCITY
         self.control_period = self.CONTROL_PERIOD
         self.gyro_deadband = self.GYRO_DEADBAND
-        
+
         # Home keyframe joint positions from scene.xml
         # Format: [left_hip_yaw, left_hip_roll, left_hip_pitch, left_knee, left_ankle,
         #          neck_pitch, head_pitch, head_yaw, head_roll,
         #          right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle]
-        self.home_joint_positions = np.array([
-            0.002,    # left_hip_yaw
-            0.053,    # left_hip_roll
-            -0.63,    # left_hip_pitch
-            1.368,    # left_knee
-            -0.784, # left_ankle
-            0.0,      # neck_pitch
-            0.0,      # head_pitch
-            0.0,      # head_yaw
-            0.0,      # head_roll
-            -0.003,   # right_hip_yaw
-            -0.065,   # right_hip_roll
-            0.635,    # right_hip_pitch
-            1.379,    # right_knee
-            -0.796,   # right_ankle
-        ])
+        self.home_joint_positions = np.array(
+            [
+                0.002,  # left_hip_yaw
+                0.053,  # left_hip_roll
+                -0.63,  # left_hip_pitch
+                1.368,  # left_knee
+                -0.784,  # left_ankle
+                0.0,  # neck_pitch
+                0.0,  # head_pitch
+                0.0,  # head_yaw
+                0.0,  # head_roll
+                -0.003,  # right_hip_yaw
+                -0.065,  # right_hip_roll
+                0.635,  # right_hip_pitch
+                1.379,  # right_knee
+                -0.796,  # right_ankle
+            ]
+        )
 
         # State tracking
         self.default_joint_positions = None
@@ -168,7 +173,7 @@ class OnnxInferROS2(Node):
         self.onnx_blend_in_steps = self.ONNX_BLEND_IN_STEPS
         self.onnx_active_steps = 0
         self.use_onnx = False  # Start with ONNX disabled by default (user can enable with 'O')
-        
+
         # Imitation phase tracking (for gait cycle)
         self.imitation_i = 0.0  # Phase counter
         self.phase_period = 50.0  # Steps per gait cycle (from reference motion)
@@ -177,30 +182,23 @@ class OnnxInferROS2(Node):
         # Velocity command (manually controlled)
         self.current_velocity_command = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.velocity_step = self.VELOCITY_STEP
-        
+
         # Control pause/resume
         self.control_paused = False
 
         # Subscribers
         self.interface_sub = self.create_subscription(
-            Float64Values,
-            '/state_interfaces_broadcaster/values',
-            self.interface_callback,
-            10
+            Float64Values, "/state_interfaces_broadcaster/values", self.interface_callback, 10
         )
 
         # Publishers
         self.velocity_cmd_pub = self.create_publisher(
-            VelocityCommandWithHead,
-            '/motion_controller/cmd_vel',
-            10
+            VelocityCommandWithHead, "/motion_controller/cmd_vel", 10
         )
         self.joint_cmd_pub = self.create_publisher(
-            Float64MultiArray,
-            '/forward_command_controller/commands',
-            10
+            Float64MultiArray, "/forward_command_controller/commands", 10
         )
-        
+
         # Wait for subscribers to connect (controller may take time to start)
         max_wait_time = 3.0  # Wait up to 3 seconds
         wait_interval = 0.1
@@ -212,14 +210,18 @@ class OnnxInferROS2(Node):
                 break
             time.sleep(wait_interval)
             waited += wait_interval
-        
+
         if subscriber_count == 0:
             self.get_logger().warn(
                 "WARNING: No subscribers to /forward_command_controller/commands after {:.1f}s. "
-                "Make sure forward_command_controller is running in the launch file!".format(waited)
+                "Make sure forward_command_controller is running in the launch file!".format(
+                    waited
+                )
             )
         else:
-            self.get_logger().info(f"forward_command_controller connected ({subscriber_count} subscriber(s)) after {waited:.1f}s")
+            self.get_logger().info(
+                f"forward_command_controller connected ({subscriber_count} subscriber(s)) after {waited:.1f}s"
+            )
 
         # Keyboard input setup
         self.old_settings = termios.tcgetattr(sys.stdin)
@@ -244,7 +246,7 @@ class OnnxInferROS2(Node):
         # Set stdin to non-blocking
         flags = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-        
+
         while rclpy.ok():
             try:
                 # Read first byte
@@ -252,14 +254,14 @@ class OnnxInferROS2(Node):
                 if not key:
                     time.sleep(0.01)
                     continue
-                
+
                 # Check if it's escape sequence (arrow keys start with ESC)
-                if key == '\x1b':
+                if key == "\x1b":
                     # Try to read the next two bytes immediately
                     # In cbreak mode, arrow keys send ESC [ A/B/C/D all at once
                     try:
                         key2 = sys.stdin.read(1)
-                        if key2 == '[':
+                        if key2 == "[":
                             key3 = sys.stdin.read(1)
                             if key3:
                                 # Full arrow key sequence: ESC [ A/B/C/D
@@ -273,21 +275,22 @@ class OnnxInferROS2(Node):
                         else:
                             # ESC followed by something else, ignore
                             pass
-                    except (IOError, OSError):
+                    except OSError:
                         # No more bytes available, just ESC was pressed
                         pass
                 else:
                     # Regular single character key
                     self.handle_key(key)
-            except (IOError, OSError):
+            except OSError:
                 time.sleep(0.01)
             except Exception as e:
                 self.get_logger().warn(f"Keyboard input error: {e}")
                 time.sleep(0.1)
 
     def adjust_velocity(self, axis, delta, description=""):
-        """Adjust velocity command for given axis with clamping.
-        
+        """
+        Adjust velocity command for given axis with clamping.
+
         Parameters
         ----------
         axis : int
@@ -296,23 +299,22 @@ class OnnxInferROS2(Node):
             Change to apply
         description : str
             Optional description for logging
+
         """
         if axis == 0:  # lin_x
-            min_val, max_val = self.VELOCITY_LIMITS['lin_x']
+            min_val, max_val = self.VELOCITY_LIMITS["lin_x"]
         elif axis == 1:  # lin_y
-            min_val, max_val = self.VELOCITY_LIMITS['lin_y']
+            min_val, max_val = self.VELOCITY_LIMITS["lin_y"]
         elif axis == 2:  # ang_z
-            min_val, max_val = self.VELOCITY_LIMITS['ang_z']
+            min_val, max_val = self.VELOCITY_LIMITS["ang_z"]
         else:
             return
-        
+
         old_val = self.current_velocity_command[axis]
-        self.current_velocity_command[axis] = np.clip(
-            old_val + delta, min_val, max_val
-        )
-        
+        self.current_velocity_command[axis] = np.clip(old_val + delta, min_val, max_val)
+
         if description:
-            axis_names = ['lin_x', 'lin_y', 'ang_z']
+            axis_names = ["lin_x", "lin_y", "ang_z"]
             self.get_logger().info(
                 f"{description}, {axis_names[axis]}={self.current_velocity_command[axis]:.3f}"
             )
@@ -321,13 +323,13 @@ class OnnxInferROS2(Node):
     def handle_key(self, key):
         """Handle keyboard input."""
         # Handle arrow keys (ESC [ A/B/C/D)
-        if len(key) == 3 and key[0] == '\x1b' and key[1] == '[':
+        if len(key) == 3 and key[0] == "\x1b" and key[1] == "[":
             self.get_logger().debug(f"Arrow key detected: {repr(key)} -> {key[2]}")
             arrow_handlers = {
-                'A': lambda: self.adjust_velocity(0, self.velocity_step, "Up arrow pressed"),
-                'B': lambda: self.adjust_velocity(0, -self.velocity_step, "Down arrow pressed"),
-                'C': lambda: self.adjust_velocity(1, self.velocity_step, "Right arrow pressed"),
-                'D': lambda: self.adjust_velocity(1, -self.velocity_step, "Left arrow pressed"),
+                "A": lambda: self.adjust_velocity(0, self.velocity_step, "Up arrow pressed"),
+                "B": lambda: self.adjust_velocity(0, -self.velocity_step, "Down arrow pressed"),
+                "C": lambda: self.adjust_velocity(1, self.velocity_step, "Right arrow pressed"),
+                "D": lambda: self.adjust_velocity(1, -self.velocity_step, "Left arrow pressed"),
             }
             handler = arrow_handlers.get(key[2])
             if handler:
@@ -336,16 +338,16 @@ class OnnxInferROS2(Node):
         elif len(key) == 1:
             key_lower = key.lower()
             key_handlers = {
-                'q': lambda: self.adjust_velocity(2, self.ANGULAR_VELOCITY_STEP),
-                'e': lambda: self.adjust_velocity(2, -self.ANGULAR_VELOCITY_STEP),
-                'w': lambda: self.adjust_velocity(0, self.velocity_step),
-                's': lambda: self.adjust_velocity(0, -self.velocity_step),
-                'a': lambda: self.adjust_velocity(1, -self.velocity_step),
-                'd': lambda: self.adjust_velocity(1, self.velocity_step),
-                'z': self._zero_velocity,
-                'o': self._toggle_onnx,
-                'p': self._toggle_pause,
-                'r': self.reset_to_home,
+                "q": lambda: self.adjust_velocity(2, self.ANGULAR_VELOCITY_STEP),
+                "e": lambda: self.adjust_velocity(2, -self.ANGULAR_VELOCITY_STEP),
+                "w": lambda: self.adjust_velocity(0, self.velocity_step),
+                "s": lambda: self.adjust_velocity(0, -self.velocity_step),
+                "a": lambda: self.adjust_velocity(1, -self.velocity_step),
+                "d": lambda: self.adjust_velocity(1, self.velocity_step),
+                "z": self._zero_velocity,
+                "o": self._toggle_onnx,
+                "p": self._toggle_pause,
+                "r": self.reset_to_home,
             }
             handler = key_handlers.get(key_lower)
             if handler:
@@ -388,15 +390,15 @@ class OnnxInferROS2(Node):
     def reset_to_home(self):
         """Reset robot to home keyframe position."""
         self.get_logger().info("Resetting robot to home position...")
-        
+
         # Publish home joint positions multiple times to ensure it's received
         cmd_msg = Float64MultiArray()
         cmd_msg.data = self.home_joint_positions.tolist()
-        
+
         for i in range(self.RESET_PUBLISH_COUNT):
             self.joint_cmd_pub.publish(cmd_msg)
             time.sleep(self.RESET_PUBLISH_DELAY)
-        
+
         # Reset default positions and state
         self.default_joint_positions_set = False
         self.motor_targets = self.home_joint_positions.copy()
@@ -409,14 +411,18 @@ class OnnxInferROS2(Node):
         self.last_action = np.zeros(self.num_joints)
         self.last_last_action = np.zeros(self.num_joints)
         self.last_last_last_action = np.zeros(self.num_joints)
-        
-        self.get_logger().info("Robot reset to home position. Default positions will be re-initialized on next callback.")
+
+        self.get_logger().info(
+            "Robot reset to home position. Default positions will be re-initialized on next callback."
+        )
 
     def interface_callback(self, msg):
         """Process interface data and generate control."""
         # Extract interface data
         # Expected: 10 IMU + 2*num_joints (positions + velocities) + 2 contacts + 3 velocimeter
-        expected_size_with_velocimeter = 10 + 2 * self.num_joints + 2 + 3  # 43 minimum for 14 joints
+        expected_size_with_velocimeter = (
+            10 + 2 * self.num_joints + 2 + 3
+        )  # 43 minimum for 14 joints
         expected_size_min = 10 + 2 * self.num_joints  # Minimum without velocimeter
         if len(msg.values) < expected_size_min:
             return
@@ -427,13 +433,15 @@ class OnnxInferROS2(Node):
 
         # Extract joint positions and velocities
         joint_positions, joint_velocities = self._extract_joint_states(msg.values)
-        
+
         # Extract and process contact sensors
         self._extract_contact_sensors(msg.values)
-        
+
         # Extract base linear velocity from velocimeter sensor
-        base_linear_velocity = self._extract_velocimeter(msg.values, expected_size_with_velocimeter)
-        
+        base_linear_velocity = self._extract_velocimeter(
+            msg.values, expected_size_with_velocimeter
+        )
+
         # If control is paused, don't send any commands
         if self.control_paused:
             return
@@ -447,7 +455,9 @@ class OnnxInferROS2(Node):
             self.prev_motor_targets_initialized = True
             self.stabilization_steps = 0
             self.get_logger().info("Default joint positions initialized")
-            self.get_logger().info(f"Stabilization: holding default positions for {self.stabilization_delay} steps (~{self.stabilization_delay * self.control_period:.1f}s)")
+            self.get_logger().info(
+                f"Stabilization: holding default positions for {self.stabilization_delay} steps (~{self.stabilization_delay * self.control_period:.1f}s)"
+            )
 
         # Increment stabilization counter
         self.stabilization_steps += 1
@@ -455,11 +465,11 @@ class OnnxInferROS2(Node):
         # During stabilization, hold default positions
         model_action = None
         observation = None
-        
+
         if self.stabilization_steps < self.stabilization_delay:
             # Hold default positions
             self._initialize_motor_targets(self.default_joint_positions)
-            
+
             # Log stabilization progress
             if self.stabilization_steps % self.LOG_INTERVAL == 0:
                 self.get_logger().info(
@@ -487,11 +497,15 @@ class OnnxInferROS2(Node):
         cmd_msg = Float64MultiArray()
         cmd_msg.data = self.motor_targets.tolist()
         self.joint_cmd_pub.publish(cmd_msg)
-        
+
         # Debug logging (throttled)
         if self.stabilization_steps % self.LOG_INTERVAL == 0:
             motor_diff = np.max(np.abs(self.motor_targets - self.default_joint_positions))
-            onnx_status = "ON" if (self.use_onnx and self.stabilization_steps >= self.stabilization_delay) else "OFF"
+            onnx_status = (
+                "ON"
+                if (self.use_onnx and self.stabilization_steps >= self.stabilization_delay)
+                else "OFF"
+            )
             vel_cmd_str = [f"{v:.3f}" for v in self.current_velocity_command[:3]]
             self.get_logger().info(
                 f"Control: step={self.stabilization_steps}, ONNX={onnx_status}, "
@@ -500,9 +514,7 @@ class OnnxInferROS2(Node):
             )
 
         # Collect data and update action history
-        self._handle_data_collection(
-            msg, model_action, observation, base_linear_velocity
-        )
+        self._handle_data_collection(msg, model_action, observation, base_linear_velocity)
 
     def _extract_gyro(self, values):
         """Extract and process gyro data with deadband filtering."""
@@ -530,10 +542,10 @@ class OnnxInferROS2(Node):
         else:
             self.left_contact_sensor = 0.0
             self.right_contact_sensor = 0.0
-        
+
         # Always use phase-based contacts (model was trained with this)
         # Set self.use_real_contact_sensors = True in __init__ to enable real sensors (experimental)
-        if hasattr(self, 'use_real_contact_sensors') and self.use_real_contact_sensors:
+        if hasattr(self, "use_real_contact_sensors") and self.use_real_contact_sensors:
             # Validate sensor values are in reasonable range
             if 0.0 <= self.left_contact_sensor <= 1.0 and 0.0 <= self.right_contact_sensor <= 1.0:
                 self.use_real_contacts = True
@@ -551,31 +563,41 @@ class OnnxInferROS2(Node):
         """Extract base linear velocity from velocimeter sensor."""
         velocimeter_start = 40
         if len(values) >= expected_size:
-            return np.array([
-                values[velocimeter_start],
-                values[velocimeter_start + 1],
-                values[velocimeter_start + 2]
-            ])
+            return np.array(
+                [
+                    values[velocimeter_start],
+                    values[velocimeter_start + 1],
+                    values[velocimeter_start + 2],
+                ]
+            )
         else:
             # Fallback: use zeros if velocimeter not available
             return np.array([0.0, 0.0, 0.0])
 
-    def _compute_onnx_action(self, gyro, accelero, joint_positions, joint_velocities, base_linear_velocity):
-        """Compute ONNX model action and update motor targets.
-        
+    def _compute_onnx_action(
+        self, gyro, accelero, joint_positions, joint_velocities, base_linear_velocity
+    ):
+        """
+        Compute ONNX model action and update motor targets.
+
         Returns
         -------
         tuple
             (model_action, observation) or (None, None) if error
+
         """
         # Update imitation phase (gait cycle)
         self.imitation_i += 1.0 * self.phase_frequency_factor
         self.imitation_i = self.imitation_i % self.phase_period
-        
+
         # Format observation
         observation = self.format_observation(
-            gyro, accelero, joint_positions, joint_velocities,
-            self.left_contact_sensor, self.right_contact_sensor
+            gyro,
+            accelero,
+            joint_positions,
+            joint_velocities,
+            self.left_contact_sensor,
+            self.right_contact_sensor,
         )
 
         # Log raw observation vector (throttled)
@@ -596,7 +618,8 @@ class OnnxInferROS2(Node):
             blend_factor = min(1.0, self.onnx_active_steps / self.onnx_blend_in_steps)
             contact_info = (
                 f"contacts=[{self.left_contact_sensor:.3f}, {self.right_contact_sensor:.3f}]"
-                if self.use_real_contacts else "contacts=phase_est"
+                if self.use_real_contacts
+                else "contacts=phase_est"
             )
             self.get_logger().debug(
                 f"ONNX active: step={self.stabilization_steps}, active_steps={self.onnx_active_steps}, "
@@ -613,12 +636,11 @@ class OnnxInferROS2(Node):
 
         # Gradually blend in ONNX actions to prevent sudden movements
         blend_factor = min(1.0, self.onnx_active_steps / self.onnx_blend_in_steps)
-        
+
         # Blend between default positions and ONNX-generated targets
         blended_targets = (
-            (1.0 - blend_factor) * self.default_joint_positions +
-            blend_factor * desired_motor_targets
-        )
+            1.0 - blend_factor
+        ) * self.default_joint_positions + blend_factor * desired_motor_targets
 
         # Apply rate limiting
         if self.prev_motor_targets_initialized:
@@ -626,7 +648,7 @@ class OnnxInferROS2(Node):
             self.motor_targets = np.clip(
                 blended_targets,
                 self.prev_motor_targets - max_change,
-                self.prev_motor_targets + max_change
+                self.prev_motor_targets + max_change,
             )
             self.prev_motor_targets = self.motor_targets.copy()
         else:
@@ -654,8 +676,15 @@ class OnnxInferROS2(Node):
             self.prev_motor_targets = positions.copy()
             self.prev_motor_targets_initialized = True
 
-    def format_observation(self, gyro, accelero, joint_positions, joint_velocities, 
-                           left_contact_sensor, right_contact_sensor):
+    def format_observation(
+        self,
+        gyro,
+        accelero,
+        joint_positions,
+        joint_velocities,
+        left_contact_sensor,
+        right_contact_sensor,
+    ):
         """Format observation exactly as observation_formatter.cpp does."""
         obs = []
 
@@ -712,18 +741,10 @@ class OnnxInferROS2(Node):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='ONNX inference-based robot control in ROS2')
+    parser = argparse.ArgumentParser(description="ONNX inference-based robot control in ROS2")
+    parser.add_argument("--onnx-model", type=str, required=True, help="Path to ONNX model file")
     parser.add_argument(
-        '--onnx-model',
-        type=str,
-        required=True,
-        help='Path to ONNX model file'
-    )
-    parser.add_argument(
-        '--num-joints',
-        type=int,
-        default=14,
-        help='Number of joints (default: 14)'
+        "--num-joints", type=int, default=14, help="Number of joints (default: 14)"
     )
 
     args = parser.parse_args()
@@ -747,6 +768,5 @@ def main():
             pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
