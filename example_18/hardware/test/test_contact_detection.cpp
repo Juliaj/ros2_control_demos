@@ -15,18 +15,17 @@
 // Authors: Julia Jia
 
 #include <gtest/gtest.h>
+#include <hardware_interface/version.h>
 
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <thread>
 
-#include <mujoco/mujoco.h>
-
-#include <hardware_interface/version.h>
-#include <hardware_interface/hardware_info.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <ros2_control_demo_example_18/duck_mini_mujoco_system_interface.hpp>
+#include <hardware_interface/hardware_info.hpp>
+
+#include "ros2_control_demo_example_18/duck_mini_mujoco_system_interface.hpp"
 
 #define ROS_DISTRO_HUMBLE (HARDWARE_INTERFACE_VERSION_MAJOR < 3)
 

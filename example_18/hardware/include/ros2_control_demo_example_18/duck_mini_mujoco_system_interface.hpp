@@ -17,12 +17,12 @@
 #ifndef ROS2_CONTROL_DEMO_EXAMPLE_18__DUCK_MINI_MUJOCO_SYSTEM_INTERFACE_HPP_
 #define ROS2_CONTROL_DEMO_EXAMPLE_18__DUCK_MINI_MUJOCO_SYSTEM_INTERFACE_HPP_
 
+#include <mujoco/mujoco.h>
+
 #include <algorithm>
 #include <cctype>
 #include <string>
 #include <vector>
-
-#include <mujoco/mujoco.h>
 
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
@@ -74,6 +74,8 @@ public:
 #else
   on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
 #endif
+
+  void register_sensors(const hardware_interface::HardwareInfo & info) override;
 
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
 

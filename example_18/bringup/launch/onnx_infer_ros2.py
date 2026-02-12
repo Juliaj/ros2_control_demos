@@ -529,8 +529,8 @@ class OnnxInferROS2(Node):
         """Extract joint positions and velocities."""
         joint_pos_start = 10
         joint_vel_start = 10 + self.num_joints
-        joint_positions = np.array(values[joint_pos_start:joint_pos_start + self.num_joints])
-        joint_velocities = np.array(values[joint_vel_start:joint_vel_start + self.num_joints])
+        joint_positions = np.array(values[joint_pos_start : joint_pos_start + self.num_joints])
+        joint_velocities = np.array(values[joint_vel_start : joint_vel_start + self.num_joints])
         return joint_positions, joint_velocities
 
     def _extract_contact_sensors(self, values):

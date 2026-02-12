@@ -37,38 +37,23 @@ hardware_interface::CallbackReturn DuckMiniMujocoSystemInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 #endif
 {
-  // Call parent on_init first
 #if ROS_DISTRO_HUMBLE
-  auto result = mujoco_ros2_control::MujocoSystemInterface::on_init(info);
+  return mujoco_ros2_control::MujocoSystemInterface::on_init(info);
 #else
-  auto result = mujoco_ros2_control::MujocoSystemInterface::on_init(params);
+  return mujoco_ros2_control::MujocoSystemInterface::on_init(params);
 #endif
-  if (result != hardware_interface::CallbackReturn::SUCCESS)
-  {
-    return result;
-  }
+}
 
-  // Register contact detection using getModel()
+void DuckMiniMujocoSystemInterface::register_sensors(const hardware_interface::HardwareInfo & info)
+{
+  MujocoSystemInterface::register_sensors(info);
   register_contact_detection();
-
-  return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 void DuckMiniMujocoSystemInterface::register_contact_detection()
 {
-  mjModel * mj_model = nullptr;
-  get_model(mj_model);
-
-  if (mj_model == nullptr)
-  {
-    RCLCPP_WARN(get_logger(), "MuJoCo model not available for contact detection registration");
-    if (mj_model != nullptr)
-    {
-      mj_deleteModel(mj_model);
-    }
-    return;
-  }
-
+  // Store sensor configuration without resolving body IDs yet
+  // Body IDs will be resolved lazily on first read() call when model is guaranteed to be ready
   const auto & hardware_info = get_hardware_info();
   for (size_t sensor_index = 0; sensor_index < hardware_info.sensors.size(); sensor_index++)
   {
@@ -105,29 +90,9 @@ void DuckMiniMujocoSystemInterface::register_contact_detection()
     sensor_data.body1_name = sensor.parameters.at("body1_name");
     sensor_data.body2_name = sensor.parameters.at("body2_name");
 
-    // Get body IDs from MuJoCo model
-    int body1_id = mj_name2id(mj_model, mjOBJ_BODY, sensor_data.body1_name.c_str());
-    int body2_id = mj_name2id(mj_model, mjOBJ_BODY, sensor_data.body2_name.c_str());
-
-    if (body1_id == -1)
-    {
-      RCLCPP_ERROR_STREAM(
-        get_logger(), "Failed to find body '" << sensor_data.body1_name
-                                              << "' in MuJoCo model for contact detection '"
-                                              << sensor_name << "'");
-      continue;
-    }
-    if (body2_id == -1)
-    {
-      RCLCPP_ERROR_STREAM(
-        get_logger(), "Failed to find body '" << sensor_data.body2_name
-                                              << "' in MuJoCo model for contact detection '"
-                                              << sensor_name << "'");
-      continue;
-    }
-
-    sensor_data.body1_id = body1_id;
-    sensor_data.body2_id = body2_id;
+    // Body IDs will be resolved lazily - initialize to invalid values
+    sensor_data.body1_id = -1;
+    sensor_data.body2_id = -1;
 
     // Optional consumer mode + debounce parameters
     // - collision: raw contact (default)
@@ -200,13 +165,8 @@ void DuckMiniMujocoSystemInterface::register_contact_detection()
     RCLCPP_INFO_STREAM(
       get_logger(), "Registered contact detection '"
                       << sensor_name << "' checking contact between '" << sensor_data.body1_name
-                      << "' and '" << sensor_data.body2_name << "'");
-  }
-
-  // Clean up allocated memory
-  if (mj_model != nullptr)
-  {
-    mj_deleteModel(mj_model);
+                      << "' and '" << sensor_data.body2_name
+                      << "' (body IDs will be resolved on first read)");
   }
 }
 
@@ -269,13 +229,83 @@ void DuckMiniMujocoSystemInterface::update_contact_detection()
   mjData * mj_data = nullptr;
 
   // Get MuJoCo model and data using inherited methods from MujocoSystemInterface
-  get_model(mj_model);
-  get_data(mj_data);
+  try
+  {
+    get_model(mj_model);
+    get_data(mj_data);
+  }
+  catch (const std::exception & e)
+  {
+    RCLCPP_WARN(
+      get_logger(), "Failed to get MuJoCo model/data for contact detection: %s", e.what());
+    if (mj_model != nullptr)
+    {
+      mj_deleteModel(mj_model);
+    }
+    if (mj_data != nullptr)
+    {
+      mj_deleteData(mj_data);
+    }
+    return;
+  }
+  catch (...)
+  {
+    RCLCPP_WARN(
+      get_logger(), "Failed to get MuJoCo model/data for contact detection: unknown exception");
+    if (mj_model != nullptr)
+    {
+      mj_deleteModel(mj_model);
+    }
+    if (mj_data != nullptr)
+    {
+      mj_deleteData(mj_data);
+    }
+    return;
+  }
 
   if (mj_model == nullptr || mj_data == nullptr)
   {
     RCLCPP_WARN(get_logger(), "MuJoCo model or data not available for contact detection");
+    if (mj_model != nullptr)
+    {
+      mj_deleteModel(mj_model);
+    }
+    if (mj_data != nullptr)
+    {
+      mj_deleteData(mj_data);
+    }
     return;
+  }
+
+  // Resolve body IDs lazily on first call
+  for (auto & sensor : contact_detection_data_)
+  {
+    if (sensor.body1_id == -1 || sensor.body2_id == -1)
+    {
+      sensor.body1_id = mj_name2id(mj_model, mjOBJ_BODY, sensor.body1_name.c_str());
+      sensor.body2_id = mj_name2id(mj_model, mjOBJ_BODY, sensor.body2_name.c_str());
+
+      if (sensor.body1_id == -1)
+      {
+        RCLCPP_ERROR_STREAM(
+          get_logger(), "Failed to find body '" << sensor.body1_name
+                                                << "' in MuJoCo model for contact detection '"
+                                                << sensor.name << "'");
+        continue;
+      }
+      if (sensor.body2_id == -1)
+      {
+        RCLCPP_ERROR_STREAM(
+          get_logger(), "Failed to find body '" << sensor.body2_name
+                                                << "' in MuJoCo model for contact detection '"
+                                                << sensor.name << "'");
+        continue;
+      }
+      RCLCPP_DEBUG_STREAM(
+        get_logger(), "Resolved body IDs for contact detection '"
+                        << sensor.name << "': " << sensor.body1_name << "=" << sensor.body1_id
+                        << ", " << sensor.body2_name << "=" << sensor.body2_id);
+    }
   }
 
   // Contact detection data - check collisions using MuJoCo contact detection

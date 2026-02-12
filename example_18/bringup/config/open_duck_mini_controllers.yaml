@@ -116,7 +116,7 @@ motion_controller:
     # Update rate: 1/(sim_dt * decimation) = 1/(0.002 * 10) = 50 Hz
 
     # Publish debug topics for observation, action, and motor targets
-    enable_debug_publishing: true
+    enable_debug_publishing: false
 
     joints:
       - left_hip_yaw       # 0
