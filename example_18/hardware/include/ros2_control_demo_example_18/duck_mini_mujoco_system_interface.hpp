@@ -75,8 +75,6 @@ public:
   on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
 #endif
 
-  void register_sensors(const hardware_interface::HardwareInfo & info) override;
-
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
 
   hardware_interface::return_type read(

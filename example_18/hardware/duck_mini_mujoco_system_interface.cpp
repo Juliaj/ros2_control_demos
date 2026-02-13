@@ -38,16 +38,16 @@ hardware_interface::CallbackReturn DuckMiniMujocoSystemInterface::on_init(
 #endif
 {
 #if ROS_DISTRO_HUMBLE
-  return mujoco_ros2_control::MujocoSystemInterface::on_init(info);
+  auto ret = mujoco_ros2_control::MujocoSystemInterface::on_init(info);
 #else
-  return mujoco_ros2_control::MujocoSystemInterface::on_init(params);
+  auto ret = mujoco_ros2_control::MujocoSystemInterface::on_init(params);
 #endif
-}
-
-void DuckMiniMujocoSystemInterface::register_sensors(const hardware_interface::HardwareInfo & info)
-{
-  MujocoSystemInterface::register_sensors(info);
+  if (ret != hardware_interface::CallbackReturn::SUCCESS)
+  {
+    return ret;
+  }
   register_contact_detection();
+  return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 void DuckMiniMujocoSystemInterface::register_contact_detection()

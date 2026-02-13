@@ -264,7 +264,8 @@ if(BUILD_TESTING)
       set(mujoco_FOUND TRUE)
     endif()
   else()
-    message(STATUS "MuJoCo not found via find_package or MUJOCO_INSTALL_DIR. Tests require MuJoCo to be installed or mujoco_ros2_control to provide it.")
+    message(STATUS "MuJoCo not found via find_package or MUJOCO_INSTALL_DIR. Tests require MuJoCo "
+      "to be installed or mujoco_ros2_control to provide it.")
     set(mujoco_FOUND FALSE)
   endif()
 
