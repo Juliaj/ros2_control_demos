@@ -1,0 +1,188 @@
+# Local copy of ros2_control_ci reusable workflow with optional additional_cmake_args and additional_colcon_args.
+# See: ros-controls/ros2_control_ci .github/workflows/reusable-industrial-ci-with-cache.yml
+
+name: Reusable industrial_ci Workflow with Cache
+
+on:
+  workflow_call:
+    inputs:
+      ref_for_scheduled_build:
+        description: 'Reference on which the repo should be checkout for scheduled build. Usually is this name of a branch or a tag.'
+        default: ''
+        required: false
+        type: string
+      upstream_workspace:
+        description: 'UPSTREAM_WORKSPACE variable for industrial_ci. Usually path to local .repos file.'
+        required: false
+        type: string
+      target_workspace:
+        description: 'TARGET_WORKSPACE variable for industrial_ci. If not provided, defaults to the current repo.'
+        required: false
+        default: ""
+        type: string
+      downstream_workspace:
+        description: 'DOWNSTREAM_WORKSPACE variable for industrial_ci. If set, downstream packages will be built and tested against this repo'
+        required: false
+        default: ''
+        type: string
+      not_test_downstream:
+        description: 'NOT_TEST_DOWNSTREAM variable for industrial_ci. If true, downstream packages will not be tested'
+        default: false
+        type: boolean
+      not_test_build:
+        description: 'NOT_TEST_BUILD variable for industrial_ci. If true, tests in build space will not be run.'
+        default: false
+        type: boolean
+      ros_distro:
+        description: 'ROS_DISTRO variable for industrial_ci'
+        required: true
+        type: string
+      ros_repo:
+        description: 'ROS_REPO to run for industrial_ci. Possible values: "main", "testing"'
+        default: 'main'
+        required: false
+        type: string
+      os_code_name:
+        description: 'OS_CODE_NAME variable for industrial_ci'
+        default: ''
+        required: false
+        type: string
+      rosdep_skip_keys:
+        description: 'ROSDEP_SKIP_KEYS variable for industrial_ci'
+        default: ''
+        required: false
+        type: string
+      ccache_dir:
+        description: 'Local path to store cache (from "github.workspace"). For standard industrial_ci configuration do not have to be changed'
+        default: '.ccache'
+        required: false
+        type: string
+      basedir:
+        description: 'Local path to workspace base directory to cache (from "github.workspace"). For standard industrial_ci configuration do not have to be changed'
+        default: '.work'
+        required: false
+        type: string
+      additional_debs:
+        description: 'Additional debs to install for the build'
+        default: ''
+        required: false
+        type: string
+      c_compiler:
+        description: 'C-compiler; set to clang to use clang as the C compiler'
+        default: ''
+        required: false
+        type: string
+      cxx_compiler:
+        description: 'C++-compiler; set to clang++ to use clang as the C compiler'
+        default: ''
+        required: false
+        type: string
+      rmw_implementation:
+        description: 'RMW implementation to use'
+        default: 'rmw_cyclonedds_cpp'
+        required: false
+        type: string
+      docker_image_tag_suffix:
+        description: 'Optional suffix appended to the docker tag, e.g. -pr-123'
+        default: ''
+        required: false
+        type: string
+      additional_cmake_args:
+        description: 'Extra CMake arguments appended to CMAKE_ARGS (e.g. -DBUILD_TESTING=OFF).'
+        default: ''
+        required: false
+        type: string
+      additional_colcon_args:
+        description: 'Extra arguments for colcon build (e.g. --packages-skip PKG_NAME).'
+        default: ''
+        required: false
+        type: string
+
+jobs:
+  reusable_industrial_ci_with_cache:
+    name: ${{ inputs.ros_distro }} ${{ inputs.ros_repo }} ${{ inputs.os_code_name }}
+    if: ${{ !(github.event_name == 'pull_request' && contains(join(github.event.pull_request.labels.*.name, ','), 'conflicts')) }}
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/${{ inputs.ccache_dir }}
+      BASEDIR: ${{ github.workspace }}/${{ inputs.basedir }}
+      CACHE_PREFIX: ${{ inputs.ros_distro }}-${{ inputs.upstream_workspace }}-${{ inputs.ros_repo }}-${{ github.job }}
+    steps:
+      - name: Checkout ${{ github.ref }} when build is not scheduled
+        if: ${{ github.event_name != 'schedule' }}
+        uses: actions/checkout@v6
+      - name: Checkout ${{ inputs.ref_for_scheduled_build }} on scheduled build
+        if: ${{ github.event_name == 'schedule' }}
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref_for_scheduled_build }}
+      - name: Restore ccache folder
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ env.CACHE_PREFIX }}-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ env.CACHE_PREFIX }}-${{ github.sha }}
+            ccache-${{ env.CACHE_PREFIX }}
+      - name: Get docker image name
+        id: docker_image
+        run: |
+          if [ "${{ inputs.ros_repo }}" = "main" ]; then
+            echo "DOCKER_IMAGE=ghcr.io/ros-controls/ros:${{ inputs.ros_distro }}-ubuntu${{ inputs.docker_image_tag_suffix }}" >> $GITHUB_OUTPUT
+          else
+            echo "DOCKER_IMAGE=ghcr.io/ros-controls/ros:${{ inputs.ros_distro }}-ubuntu-testing${{ inputs.docker_image_tag_suffix }}" >> $GITHUB_OUTPUT
+          fi
+      - uses: 'ros-industrial/industrial_ci@master'
+        env:
+          UPSTREAM_WORKSPACE: ${{ inputs.upstream_workspace }}
+          TARGET_WORKSPACE: ${{ inputs.target_workspace }}
+          NOT_TEST_BUILD: ${{ inputs.not_test_build }}
+          DOWNSTREAM_WORKSPACE: ${{ inputs.downstream_workspace }}
+          NOT_TEST_DOWNSTREAM: ${{ inputs.not_test_downstream }}
+          DOCKER_IMAGE: ${{ steps.docker_image.outputs.DOCKER_IMAGE }}
+          ROS_REPO: ${{ inputs.ros_repo }}
+          OS_CODE_NAME: ${{ inputs.os_code_name }}
+          ROSDEP_SKIP_KEYS: ${{ inputs.rosdep_skip_keys }}
+          ADDITIONAL_DEBS: ${{ inputs.additional_debs }}
+          CC: ${{ inputs.c_compiler }}
+          CXX: ${{ inputs.cxx_compiler }}
+          CMAKE_ARGS: -DCMAKE_CXX_FLAGS="-isystem /opt/ros/${{ inputs.ros_distro }}/include" ${{ inputs.additional_cmake_args }}
+          ADDITIONAL_COLCON_ARGS: ${{ inputs.additional_colcon_args }}
+          RMW_IMPLEMENTATION: ${{ inputs.rmw_implementation }}
+        id: ici
+      - name: Save ccache folder
+        uses: actions/cache/save@v5
+        if: ${{ always() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.ici.outputs.build_target_workspace == '0' }}
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ env.CACHE_PREFIX }}-${{ github.sha }}-${{ github.run_id }}
+
+      - name: Download issue template for target failure
+        if: ${{ always() && steps.ici.outcome == 'failure' && github.event_name == 'schedule' }}
+        run: wget https://raw.githubusercontent.com/ros-controls/ros2_control_ci/master/.github/issue_template_failed_ci.md -O .github/issue_template_failed_ci.md
+
+      - name: Download issue template for downstream failure
+        if: ${{ always() && steps.ici.outcome == 'failure' && github.event_name == 'schedule' }}
+        run: wget https://raw.githubusercontent.com/ros-controls/ros2_control_ci/master/.github/issue_template_failed_ci_downstream.md -O .github/issue_template_failed_ci_downstream.md
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: ${{ always() && (steps.ici.outputs.build_target_workspace == '2' || steps.ici.outputs.target_test_results == '1') && github.event_name == 'schedule'}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTION_NAME: ${{ inputs.ros_distro }}/${{ inputs.ros_repo }}
+          REF: ${{ inputs.ref_for_scheduled_build }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          update_existing: true
+          filename: .github/issue_template_failed_ci.md
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: ${{ always() && (steps.ici.outputs.build_downstream_workspace == '2' || steps.ici.outputs.downstream_test_results == '1') && github.event_name == 'schedule'}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTION_NAME: ${{ inputs.ros_distro }}/${{ inputs.ros_repo }}
+          REF: ${{ inputs.ref_for_scheduled_build }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          update_existing: true
+          filename: .github/issue_template_failed_ci_downstream.md

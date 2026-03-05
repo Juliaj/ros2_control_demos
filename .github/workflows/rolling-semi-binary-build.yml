@@ -2,6 +2,12 @@ name: Rolling Semi-Binary Build
 # description: 'Build & test that compiles the main dependencies from source.'
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref_branch:
+        description: 'Branch to run on'
+        required: false
+        default: 'example_18_ci'
   pull_request: &event
     branches:
       - master
@@ -24,13 +30,19 @@ on:
 
 jobs:
   semi_binary:
-    uses: ros-controls/ros2_control_ci/.github/workflows/reusable-industrial-ci-with-cache.yml@master
+    uses: ./.github/workflows/reusable-industrial-ci-with-cache.yml
     strategy:
       fail-fast: false
       matrix:
-        ROS_DISTRO: [rolling, kilted]
+        include:
+          - ROS_DISTRO: rolling
+            # mujoco_ros2_control is not ready for rolling, so we skip the example_18 package
+            ADDITIONAL_COLCON_ARGS: --packages-skip ros2_control_demo_example_18
+          - ROS_DISTRO: kilted
+            ADDITIONAL_COLCON_ARGS: ''
     with:
       ros_distro: ${{ matrix.ROS_DISTRO }}
       ros_repo: testing
       upstream_workspace: ros2_control_demos.${{ matrix.ROS_DISTRO }}.repos
       ref_for_scheduled_build: master
+      additional_colcon_args: ${{ matrix.ADDITIONAL_COLCON_ARGS }}
