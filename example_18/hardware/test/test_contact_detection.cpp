@@ -134,7 +134,10 @@ protected:
   void create_test_model()
   {
     // Create a simple MuJoCo XML with two bodies and a floor
-    test_model_path_ = "/tmp/test_contact_detection_model.xml";
+    const auto unique = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    test_model_path_ =
+      (std::filesystem::temp_directory_path() / ("test_contact_detection_model_" + unique + ".xml"))
+        .string();
     std::ofstream file(test_model_path_);
     file << R"(<?xml version="1.0"?>
 <mujoco model="test_contact_detection">
