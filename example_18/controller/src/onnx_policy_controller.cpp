@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <regex>
+#include <stdexcept>
 
 #include "ament_index_cpp/version.h"
 #if AMENT_INDEX_CPP_VERSION_MINOR >= 13
