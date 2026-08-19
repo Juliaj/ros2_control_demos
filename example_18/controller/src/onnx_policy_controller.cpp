@@ -418,7 +418,17 @@ return_type OnnxPolicyController::update(
     {
       return return_type::ERROR;
     }
-    joint_commands = action_processor_->process(model_outputs, default_joint_positions_);
+    try
+    {
+      joint_commands = action_processor_->process(model_outputs, default_joint_positions_);
+    }
+    catch (const std::exception & e)
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 1000,
+        "Failed to process model outputs into joint commands: %s", e.what());
+      return return_type::ERROR;
+    }
     onnx_active_steps_++;
     double blend_factor =
       std::min(1.0, static_cast<double>(onnx_active_steps_) / static_cast<double>(blend_in_steps_));
