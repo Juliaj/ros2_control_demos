@@ -32,17 +32,21 @@ Prerequisites
 Dependencies
 ~~~~~~~~~~~~
 
-Install MuJoCo packages from apt, then build `onnxruntime_vendor <https://index.ros.org/p/onnxruntime_vendor/>`_ from source (not available via apt yet):
+Install MuJoCo and onnxruntime_vendor packages from apt:
 
 .. code-block:: bash
 
    sudo apt update
-   sudo apt install ros-$ROS_DISTRO-mujoco-ros2-control ros-$ROS_DISTRO-mujoco-ros2-control-msgs
+   sudo apt install ros-$ROS_DISTRO-mujoco-ros2-control ros-$ROS_DISTRO-mujoco-ros2-control-msgs ros2-$ROS_DISTRO-onnxruntime-vendor
 
-   # from your ROS 2 workspace root
-   git clone https://github.com/ros-controls/onnxruntime_vendor.git src/onnxruntime_vendor
-   colcon build --symlink-install --packages-select onnxruntime_vendor
-   source install/setup.bash
+or simply
+
+.. code-block:: bash
+
+   sudo apt update
+   cd ~/ros2_ws # where your ROS 2 workspace is located
+   rosdep install --from-paths src --ignore-src -r -y
+
 
 Model and workspace
 ~~~~~~~~~~~~~~~~~~~
@@ -65,7 +69,7 @@ Build
 .. code-block:: bash
 
    cd ~/ros2_ws
-   colcon build --symlink-install --packages-select onnxruntime_vendor ros2_control_demo_description ros2_control_demo_example_18
+   colcon build --symlink-install --packages-select ros2_control_demo_description ros2_control_demo_example_18
    source install/setup.bash
 
 3. (Optional) Verify the URDF in RViz:
