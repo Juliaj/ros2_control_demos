@@ -20,11 +20,11 @@ Robot description
 The demo uses URDF, MuJoCo XML models, and ros2_control configuration from ``description/``.
 
 * The meshes come from `Open_Duck_Mini <https://github.com/apirrone/Open_Duck_Mini/tree/v2/mini_bdx/robots/open_duck_mini_v2>`__.
-* The MuJoCo model (open_duck_mini_v2.xml, scene.xml) is adapted from * Open_Duck_Playground with BAM-tuned actuator parameters.
+* The MuJoCo model (open_duck_mini_v2.xml, scene.xml) is adapted from Open_Duck_Playground with BAM-tuned actuator parameters.
 
 A custom hardware interface adds foot contact detection via ``mjData->contact[]``.
 
-See `description/README.md <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/example_18/description/README.md>`_ for sources, structure, and modifications.
+See `ros2_control_demo_description/openduckmini/README.md <https://github.com/ros-controls/ros2_control_demos/tree/{REPOS_FILE_BRANCH}/ros2_control_demo_description/openduckmini/README.md>`_ for sources, structure, and modifications.
 
 Prerequisites
 -------------
@@ -37,7 +37,7 @@ Install MuJoCo and onnxruntime_vendor packages from apt:
 .. code-block:: bash
 
    sudo apt update
-   sudo apt install ros-$ROS_DISTRO-mujoco-ros2-control ros-$ROS_DISTRO-mujoco-ros2-control-msgs ros2-$ROS_DISTRO-onnxruntime-vendor
+   sudo apt install ros-$ROS_DISTRO-mujoco-ros2-control ros-$ROS_DISTRO-mujoco-ros2-control-msgs ros-$ROS_DISTRO-onnxruntime-vendor
 
 or simply
 
