@@ -39,7 +39,7 @@ The meshes are installed in ``openduckmini/assets/``. The URDF is included via `
 
 ### ros2_control Sensor Configuration
 
-The ``open_duck_mini.ros2_control.xacro`` file defines an IMU sensor named ``imu`` (matching MuJoCo site name) with 10 state interfaces (orientation, angular velocity, linear acceleration), and two foot contact sensors (``left_foot_contact``, ``right_foot_contact``) with ``contact_raw`` and ``contact`` interfaces. Contact detection is implemented in ``DuckMiniMujocoSystemInterface`` via ``mjData->contact[]``. The IMU maps to MuJoCo outputs: framequat, gyro, accelerometer. Joint limits are extracted from the MuJoCo XML joint ``range`` attributes.
+The ``open_duck_mini.ros2_control.xacro`` file defines an IMU sensor named ``imu`` (matching MuJoCo site name) with 10 state interfaces (orientation, angular velocity, linear acceleration), and two foot contact sensors (``left_foot_contact``, ``right_foot_contact``) with the ``contact_raw`` interface. Contact detection is implemented in ``DuckMiniMujocoSystemInterface`` via ``mjData->contact[]``. The IMU maps to MuJoCo outputs: framequat, gyro, accelerometer. Joint limits are extracted from the MuJoCo XML joint ``range`` attributes.
 
 ### Minimal URDF for TF Publishing
 
